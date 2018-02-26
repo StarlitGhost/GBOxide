@@ -1,0 +1,8 @@
+[package]
+name = "gboxide"
+version = "0.1.0"
+authors = ["StarlitGhost <36834781+StarlitGhost@users.noreply.github.com>"]
+
+[dependencies]
+byteorder = "1"
+clap = {version = "2.30", features = ["yaml"]}

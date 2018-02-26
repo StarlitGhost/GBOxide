@@ -1,0 +1,13 @@
+name: GameBoy Oxide
+version: "0.1"
+about: A GameBoy Emulator written in Rust
+author: StarlitGhost <starlitwraith@gmail.com>
+
+settings:
+- ArgRequiredElseHelp
+
+args:
+- ROMFILE:
+    help: GameBoy rom to load
+    required: true
+    index: 1
