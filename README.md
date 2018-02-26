@@ -11,3 +11,9 @@ Most of these are linked from [avivace/awesome-gbdev](https://github.com/avivace
 - [GameBoy Crib Sheet](http://gbdev.gg8.se/files/docs/GBCribSheet000129.pdf)
 - [Cycle-Accurate Game Boy Docs](https://github.com/AntonioND/giibiiadvance/blob/master/docs/TCAGBD.pdf)
 - [Official GameBoy Programming Manual](https://archive.org/download/GameBoyProgManVer1.1/GameBoyProgManVer1.1.pdf) (less relevant for emulation but still a handy resource)
+
+## Test Roms
+
+- [Blargg's](http://gbdev.gg8.se/files/roms/blargg-gb-tests/)
+- [Gekkio & Wilbert Pol's](https://gekkio.fi/files/mooneye-gb/latest/tests/)
+
