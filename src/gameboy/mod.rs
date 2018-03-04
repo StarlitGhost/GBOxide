@@ -1,4 +1,5 @@
 pub mod cpu;
+pub mod mmu;
 
 use std::error::Error;
 
@@ -9,7 +10,10 @@ pub fn run(cartridge: Cartridge) -> Result<(), Box<Error>> {
     println!("{:#?}", cartridge.header);
     println!("read_rom_size: {}", cartridge.rom_data.len());
 
-    gameboy::cpu::execute(&cartridge.rom_data)?;
+    let mut cpu = gameboy::cpu::CPU::new();
+    let mut mmu = gameboy::mmu::MMU::new();
+
+    cpu.execute(&cartridge.rom_data, &mut mmu)?;
 
     Ok(())
 }

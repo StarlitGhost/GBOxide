@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "Debug",
             "program": "${workspaceFolder}/target/debug/gboxide",
-            "args": ["roms/awakening.gb"],
+            "args": ["roms/tetris.gb"],
             "cwd": "${workspaceFolder}"
         }
     ]
