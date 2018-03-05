@@ -1,88 +1,12 @@
 use std::error::Error;
-use std::io::Cursor;
 use std::num::Wrapping;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
+use gameboy::registers::{
+    Registers, Register8Bit, Register16Bit, Flags,
+};
 use ::gameboy::mmu::MMU;
-
-pub struct Register {
-    value: [u8; 2]
-}
-
-impl Register {
-    pub fn get_high(&self) -> u8 {
-        self.value[1]
-    }
-    pub fn set_high(&mut self, value: u8) {
-        self.value[1] = value;
-    }
-
-    pub fn get_low(&self) -> u8 {
-        self.value[0]
-    }
-    pub fn set_low(&mut self, value: u8) {
-        self.value[0] = value;
-    }
-
-    pub fn get_u16(&self) -> u16 {
-        Cursor::new(self.value).read_u16::<LittleEndian>().unwrap()
-    }
-    pub fn set_u16(&mut self, value: u16) {
-        self.value[0] = (value & 0xFF) as u8;
-        self.value[1] = ((value >> 8) & 0xFF) as u8;
-    }
-
-    pub fn decrement_high(&mut self) {
-        let value = Wrapping(self.get_high()) - Wrapping(1);
-        self.set_high(value.0);
-    }
-    pub fn increment_high(&mut self) {
-        let value = Wrapping(self.get_high()) + Wrapping(1);
-        self.set_high(value.0);
-    }
-
-    pub fn decrement_low(&mut self) {
-        let value = Wrapping(self.get_low()) - Wrapping(1);
-        self.set_low(value.0);
-    }
-    pub fn increment_low(&mut self) {
-        let value = Wrapping(self.get_low()) + Wrapping(1);
-        self.set_low(value.0);
-    }
-
-    pub fn decrement_u16(&mut self) {
-        let value = Wrapping(self.get_u16()) - Wrapping(1);
-        self.set_u16(value.0);
-    }
-    pub fn increment_u16(&mut self) {
-        let value = Wrapping(self.get_u16()) + Wrapping(1);
-        self.set_u16(value.0);
-    }
-}
-
-pub struct Registers {
-    pub af: Register,
-    pub bc: Register,
-    pub de: Register,
-    pub hl: Register,
-    pub sp: u16,
-    pub pc: u16,
-}
-
-impl Registers {
-    pub fn new() -> Registers {
-        let af = Register { value: [0xB0 as u8, 0x01 as u8] };
-        let bc = Register { value: [0x13 as u8, 0x00 as u8] };
-        let de = Register { value: [0xD8 as u8, 0x00 as u8] };
-        let hl = Register { value: [0x4D as u8, 0x01 as u8] };
-
-        let sp = 0xFFFE as u16;
-        let pc = 0x0100 as u16;
-
-        Registers { af, bc, de, hl, sp, pc }
-    }
-}
 
 fn read_u8(rom: &Vec<u8>, pc: &mut u16) -> u8 {
     let mut pc_usize = *pc as usize;
@@ -101,16 +25,6 @@ fn read_u16(rom: &Vec<u8>, pc: &mut u16) -> u16 {
     low | (high << 8)
 }
 
-bitflags! {
-    struct Flags: u8 {
-        const ZERO = 0x80;
-        const NEGATIVE = 0x40;
-        const HALFCARRY = 0x20;
-        const CARRY = 0x10;
-        const NONE = 0x00;
-    }
-}
-
 pub struct CPU {
     r: Registers,
 }
@@ -120,9 +34,19 @@ impl CPU {
         CPU { r: Registers::new() }
     }
 
-    fn decrement_high(&mut self, reg: &mut Register) {
-        let result = reg.get_high() - 1;
-        reg.set_high(result);
+    fn decrement(&mut self, reg: &Register) {
+        let (&mut r, get_func, set_func) = match reg {
+            A => (&mut self.r.af, Register::get_high, Register::set_high),
+            B => (&mut self.r.bc, Register::get_high, Register::set_high),
+            C => (&mut self.r.bc, Register::get_low, Register::set_low),
+            D => (&mut self.r.de, Register::get_high, Register::set_high),
+            E => (&mut self.r.de, Register::get_low, Register::set_low),
+            H => (&mut self.r.hl, Register::get_high, Register::set_high),
+            L => (&mut self.r.hl, Register::get_low, Register::set_low),
+        };
+
+        let result = get_func() - 1;
+        set_func(result);
         if self.is_set_flag(Flags::CARRY) {
             self.set_flag(Flags::CARRY);
         } else {
