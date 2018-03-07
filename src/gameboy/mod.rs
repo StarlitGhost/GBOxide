@@ -14,7 +14,7 @@ pub fn run(cartridge: Cartridge) -> Result<(), Box<Error>> {
     let mut cpu = gameboy::cpu::CPU::new();
     let mut mmu = gameboy::mmu::MMU::new();
 
-    cpu.execute(&cartridge.rom_data, &mut mmu)?;
+    cpu.execute(&cartridge, &mut mmu)?;
 
     Ok(())
 }
