@@ -8,6 +8,14 @@ use gameboy::registers::{
 };
 use ::gameboy::mmu::MMU;
 
+pub trait ReadU8 {
+    fn read_u8(&self, cpu: &mut CPU, data: &Vec<u8>) -> u8;
+}
+
+pub trait WriteU8 {
+    fn write_u8(&self, cpu: &mut CPU, data: &mut Vec<u8>);
+}
+
 fn read_u8(rom: &Vec<u8>, pc: &mut u16) -> u8 {
     let mut pc_usize = *pc as usize;
     pc_usize += 1;
