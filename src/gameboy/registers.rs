@@ -4,7 +4,16 @@ bitflags!{
         const NEGATIVE = 0x40;
         const HALFCARRY = 0x20;
         const CARRY = 0x10;
-        const NONE = 0x00;
+    }
+}
+
+impl Flags {
+    pub fn check(&self, condition: bool) -> Flags {
+        if condition {
+            *self
+        } else {
+            Flags::empty()
+        }
     }
 }
 
