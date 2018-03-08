@@ -19,9 +19,7 @@ pub trait WriteU8 {
 pub struct NextU8;
 impl ReadU8 for NextU8 {
     fn read_u8(&self, cpu: &mut CPU, mmu: &MMU) -> u8 {
-        let addr = cpu.r.pc;
-        cpu.r.pc = cpu.r.pc.wrapping_add(1);
-        mmu.read_u8(cpu.r.pc)
+        cpu.next_u8(mmu)
     }
 }
 
@@ -56,19 +54,19 @@ impl WriteU8 for Register8Bit {
 }
 
 pub enum Address {
-    BC, DE, HL
+    BC, DE, HL, HLD, HLI, NextU16, HighRAM, HighRAMC
 }
 
 impl ReadU8 for Address {
     fn read_u8(&self, cpu: &mut CPU, mmu: &MMU) -> u8 {
-        let addr = cpu.get_address(mmu, *self);
+        let addr = cpu.get_address(mmu, self);
         cpu.read_address(mmu, addr)
     }
 }
 
 impl WriteU8 for Address {
     fn write_u8(&self, cpu: &mut CPU, mmu: &mut MMU, value: u8) {
-        let addr = cpu.get_address(mmu, *self);
+        let addr = cpu.get_address(mmu, self);
         cpu.write_address(mmu, addr, value);
     }
 }
@@ -85,7 +83,7 @@ impl CPU {
     pub fn execute(&mut self, mmu: &mut MMU) -> Result<(), Box<Error>> {
         println!("-- r.pc {:#06x}", self.r.pc);
 
-        while true {
+        loop {
             let mut op = mmu.read_u8(self.r.pc);
             print!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
             self.r.pc = self.r.pc.wrapping_add(1);
@@ -101,104 +99,117 @@ impl CPU {
                 match op {
                     // NOP
                     0x00 => (),
+                    // --- 8-bit ops ---
+                    // -- LD --
+                    // LD nn,n
+                    0x3E => self.ld(mmu, A, NextU8),
+                    0x06 => self.ld(mmu, B, NextU8),
+                    0x0E => self.ld(mmu, C, NextU8),
+                    0x16 => self.ld(mmu, D, NextU8),
+                    0x1E => self.ld(mmu, E, NextU8),
+                    0x26 => self.ld(mmu, H, NextU8),
+                    0x2E => self.ld(mmu, L, NextU8),
+                    0x36 => self.ld(mmu, Address::HL, NextU8),
+                    // LD r1,r2
+                    0x7F => self.ld(mmu, A, A),
+                    0x78 => self.ld(mmu, A, B),
+                    0x79 => self.ld(mmu, A, C),
+                    0x7A => self.ld(mmu, A, D),
+                    0x7B => self.ld(mmu, A, E),
+                    0x7C => self.ld(mmu, A, H),
+                    0x7D => self.ld(mmu, A, L),
+                    0x0A => self.ld(mmu, A, Address::BC),
+                    0x1A => self.ld(mmu, A, Address::DE),
+                    0x7E => self.ld(mmu, A, Address::HL),
+                    0xFA => self.ld(mmu, A, Address::NextU16),
+                    0xF2 => self.ld(mmu, A, Address::HighRAMC),
+                    0x3A => self.ld(mmu, A, Address::HLD),
+                    0x2A => self.ld(mmu, A, Address::HLI),
+                    0x02 => self.ld(mmu, Address::BC, A),
+                    0x12 => self.ld(mmu, Address::DE, A),
+                    0x77 => self.ld(mmu, Address::HL, A),
+                    0xEA => self.ld(mmu, Address::NextU16, A),
+                    0xE2 => self.ld(mmu, Address::HighRAMC, A),
+                    0x32 => self.ld(mmu, Address::HLD, A),
+                    0x22 => self.ld(mmu, Address::HLI, A),
+                    0x47 => self.ld(mmu, B, A),
+                    0x40 => self.ld(mmu, B, B),
+                    0x41 => self.ld(mmu, B, C),
+                    0x42 => self.ld(mmu, B, D),
+                    0x43 => self.ld(mmu, B, E),
+                    0x44 => self.ld(mmu, B, H),
+                    0x45 => self.ld(mmu, B, L),
+                    0x46 => self.ld(mmu, B, Address::HL),
+                    0x4F => self.ld(mmu, C, A),
+                    0x48 => self.ld(mmu, C, B),
+                    0x49 => self.ld(mmu, C, C),
+                    0x4A => self.ld(mmu, C, D),
+                    0x4B => self.ld(mmu, C, E),
+                    0x4C => self.ld(mmu, C, H),
+                    0x4D => self.ld(mmu, C, L),
+                    0x4E => self.ld(mmu, C, Address::HL),
+                    0x57 => self.ld(mmu, D, A),
+                    0x50 => self.ld(mmu, D, B),
+                    0x51 => self.ld(mmu, D, C),
+                    0x52 => self.ld(mmu, D, D),
+                    0x53 => self.ld(mmu, D, E),
+                    0x54 => self.ld(mmu, D, H),
+                    0x55 => self.ld(mmu, D, L),
+                    0x56 => self.ld(mmu, D, Address::HL),
+                    0x5F => self.ld(mmu, E, A),
+                    0x58 => self.ld(mmu, E, B),
+                    0x59 => self.ld(mmu, E, C),
+                    0x5A => self.ld(mmu, E, D),
+                    0x5B => self.ld(mmu, E, E),
+                    0x5C => self.ld(mmu, E, H),
+                    0x5D => self.ld(mmu, E, L),
+                    0x5E => self.ld(mmu, E, Address::HL),
+                    0x67 => self.ld(mmu, H, A),
+                    0x60 => self.ld(mmu, H, B),
+                    0x61 => self.ld(mmu, H, C),
+                    0x62 => self.ld(mmu, H, D),
+                    0x63 => self.ld(mmu, H, E),
+                    0x64 => self.ld(mmu, H, H),
+                    0x65 => self.ld(mmu, H, L),
+                    0x66 => self.ld(mmu, H, Address::HL),
+                    0x6F => self.ld(mmu, L, A),
+                    0x68 => self.ld(mmu, L, B),
+                    0x69 => self.ld(mmu, L, C),
+                    0x6A => self.ld(mmu, L, D),
+                    0x6B => self.ld(mmu, L, E),
+                    0x6C => self.ld(mmu, L, H),
+                    0x6D => self.ld(mmu, L, L),
+                    0x6E => self.ld(mmu, L, Address::HL),
+                    0x70 => self.ld(mmu, Address::HL, B),
+                    0x71 => self.ld(mmu, Address::HL, C),
+                    0x72 => self.ld(mmu, Address::HL, D),
+                    0x73 => self.ld(mmu, Address::HL, E),
+                    0x74 => self.ld(mmu, Address::HL, H),
+                    0x75 => self.ld(mmu, Address::HL, L),
                     // DEC
-                    0x3D => self.dec(&mut mmu, A),
-                    0x05 => self.dec(&mut mmu, B),
-                    0x0D => self.dec(&mut mmu, C),
-                    0x15 => self.dec(&mut mmu, D),
-                    0x1D => self.dec(&mut mmu, E),
-                    0x25 => self.dec(&mut mmu, H),
-                    0x2D => self.dec(&mut mmu, L),
-                    0x35 => self.dec(&mut mmu, Address::HL),
+                    0x3D => self.dec(mmu, A),
+                    0x05 => self.dec(mmu, B),
+                    0x0D => self.dec(mmu, C),
+                    0x15 => self.dec(mmu, D),
+                    0x1D => self.dec(mmu, E),
+                    0x25 => self.dec(mmu, H),
+                    0x2D => self.dec(mmu, L),
+                    0x35 => self.dec(mmu, Address::HL),
                     // XOR
-                    0xAF => self.xor(&mmu, A),
+                    0xAF => self.xor(mmu, A),
                     // JP
-                    0xC3 => {
-                        self.r.pc = read_u16(rom, &mut self.r.pc);
-                        print!(", {:#06x}", self.r.pc);
-                    },
-                    // JR cc,n
-                    0x20 => { // !Z,n
-                        let offset = read_u8(rom, &mut self.r.pc);
-                        print!(", offset {:#04x}, Z {}", offset, self.is_set_flag(Flags::ZERO));
-                        if !self.is_set_flag(Flags::ZERO) {
-                            self.r.pc = self.r.pc + offset as u16;
-                        } else {
-                            self.r.pc += 1;
-                        }
-                    },
-                    0x28 => { // Z,n
-                        let offset = read_u8(rom, &mut self.r.pc);
-                        print!(", offset {:#04x}, Z {}", offset, self.is_set_flag(Flags::ZERO));
-                        if self.is_set_flag(Flags::ZERO) {
-                            self.r.pc = self.r.pc + offset as u16;
-                        } else {
-                            self.r.pc += 1;
-                        }
-                    },
-                    0x30 => { // !C,n
-                        let offset = read_u8(rom, &mut self.r.pc);
-                        print!(", offset {:#04x}, Z {}", offset, self.is_set_flag(Flags::ZERO));
-                        if !self.is_set_flag(Flags::CARRY) {
-                            self.r.pc = self.r.pc + offset as u16;
-                        } else {
-                            self.r.pc += 1;
-                        }
-                    },
-                    0x38 => { // C,n
-                        let offset = read_u8(rom, &mut self.r.pc);
-                        print!(", offset {:#04x}, Z {}", offset, self.is_set_flag(Flags::ZERO));
-                        if self.is_set_flag(Flags::CARRY) {
-                            self.r.pc = self.r.pc + offset as u16;
-                        } else {
-                            self.r.pc += 1;
-                        }
-                    },
+                    0xC3 => self.jp(mmu),
                     // Call
-                    0xCD => {
-                        /*push self.r.pc onto stack*/
-                        self.r.pc = read_u16(rom, &mut self.r.pc);
-                        print!(", {:#06x}", self.r.pc);
-                    },
-                    // 8-bit LD
-                    0x06 => {
-                        let value = read_u8(rom, &mut self.r.pc);
-                        print!(", {:#04x}", value);
-                        self.r.bc.set_high(value);
-                        self.r.pc += 1;
-                    },
-                    0x0E => {
-                        let value = read_u8(rom, &mut self.r.pc);
-                        print!(", {:#04x}", value);
-                        self.r.bc.set_low(value);
-                        self.r.pc += 1;
-                    },
-                    0xF0 => {
-                        self.r.af.set_high(/*load from memory addr 0xFF00 +*/ read_u8(rom, &mut self.r.pc));
-                        self.r.pc += 1;
-                    },
-                    // 8-bit LDD
-                    0x32 => {
-                        mmu.write_u8(self.r.hl.get_u16(), self.r.af.get_high());
-                        self.r.hl.decrement_u16();
-                        self.r.pc += 1;
-                    },
-                    // 16-bit LD
-                    0x21 => {
-                        let value = read_u16(rom, &mut self.r.pc);
-                        print!(", {:#06x}", value);
-                        self.r.hl.set_u16(value);
-                        self.r.pc += 1;
-                    },
+                    0xCD => self.call(mmu),
                     // RST
-                    0xDF => {
-                        /*push self.r.pc onto stack*/
-                        self.r.pc = 0x0018;
-                    },
-                    0xFF => {
-                        /*push self.r.pc onto stack*/
-                        self.r.pc = 0x0038;
-                    },
+                    0xC7 => self.rst(mmu, 0x00),
+                    0xCF => self.rst(mmu, 0x08),
+                    0xD7 => self.rst(mmu, 0x10),
+                    0xDF => self.rst(mmu, 0x18),
+                    0xE7 => self.rst(mmu, 0x20),
+                    0xEF => self.rst(mmu, 0x28),
+                    0xF7 => self.rst(mmu, 0x30),
+                    0xFF => self.rst(mmu, 0x38),
                     _ => return Err(format!("unrecognized opcode {:#04x}", op).into())
                 };
             }
@@ -220,12 +231,49 @@ impl CPU {
         ((high as u16) << 8) | (low as u16)
     }
 
-    fn get_address(&self, mmu: &MMU, address: Address) -> u16 {
+    fn push_u8(&mut self, mmu: &mut MMU, value: u8) {
+        self.r.sp = self.r.sp.wrapping_sub(1);
+        self.write_address(mmu, self.r.sp, value);
+    }
+
+    fn push_u16(&mut self, mmu: &mut MMU, value: u16) {
+        self.push_u8(mmu, (value >> 8) as u8);
+        self.push_u8(mmu, value as u8);
+    }
+
+    fn pop_u8(&mut self, mmu: &mut MMU) -> u8 {
+        let value = self.read_address(mmu, self.r.sp);
+        self.r.sp = self.r.sp.wrapping_add(1);
+        value
+    }
+
+    fn pop_u16(&mut self, mmu: &mut MMU) -> u16 {
+        let low = self.pop_u8(mmu);
+        let high = self.pop_u8(mmu);
+        ((high as u16) << 8) | (low as u16)
+    }
+
+    fn get_address(&mut self, mmu: &MMU, address: &Address) -> u16 {
         use self::Address::*;
-        match address {
+        match *address {
             BC => self.r.get_u16(Register16Bit::BC),
             DE => self.r.get_u16(Register16Bit::DE),
             HL => self.r.get_u16(Register16Bit::HL),
+            HLD => {
+                let address = self.r.get_u16(Register16Bit::HL);
+                let new_address = address.wrapping_sub(1);
+                self.r.set_u16(Register16Bit::HL, new_address);
+                address
+            },
+            HLI => {
+                let address = self.r.get_u16(Register16Bit::HL);
+                let new_address = address.wrapping_add(1);
+                self.r.set_u16(Register16Bit::HL, new_address);
+                address
+            },
+            NextU16 => self.next_u16(mmu),
+            HighRAM => 0xFF00 | self.next_u8(mmu) as u16,
+            HighRAMC => 0xFF00 | self.r.c as u16,
         }
     }
 
@@ -237,19 +285,51 @@ impl CPU {
         mmu.write_u8(address, value);
     }
 
+    fn call_address(&mut self, mmu: &mut MMU, address: u16) {
+        let pc = self.r.pc;
+        self.push_u16(mmu, pc);
+        self.r.pc = address;
+    }
+
     // operations
+    fn ld<W: WriteU8, R: ReadU8>(&mut self, mmu: &mut MMU, w: W, r: R) {
+        let value = r.read_u8(self, mmu);
+        w.write_u8(self, mmu, value);
+    }
+
     fn dec<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
-        let value = rw.read_u8(&mut self, &mmu);
+        let value = rw.read_u8(self, mmu);
         let new_value = value.wrapping_sub(1);
         self.r.f = Flags::ZERO.check(new_value == 0) |
                     Flags::NEGATIVE |
                     Flags::HALFCARRY.check(value & 0xF == 0x0) |
                     (Flags::CARRY & self.r.f);
-        rw.write_u8(&mut self, &mut mmu, new_value);
+        rw.write_u8(self, mmu, new_value);
     }
+
     fn xor<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
-        let value = r.read_u8(&mut self, &mmu);
+        let value = r.read_u8(self, mmu);
         self.r.a ^= value;
         self.r.f = Flags::ZERO.check(self.r.a == 0);
+    }
+
+    fn jp(&mut self, mmu: &MMU) {
+        let address = self.next_u16(mmu);
+        self.r.pc = address;
+    }
+
+    fn call(&mut self, mmu: &mut MMU) {
+        let address = self.next_u16(mmu);
+        self.call_address(mmu, address);
+    }
+
+    fn rst(&mut self, mmu: &mut MMU, address: u8) {
+        let pc = self.r.pc;
+        self.push_u16(mmu, pc);
+        self.r.pc = address as u16;
+    }
+
+    fn ret(&mut self, mmu: &mut MMU) {
+        self.r.pc = self.pop_u16(mmu);
     }
 }

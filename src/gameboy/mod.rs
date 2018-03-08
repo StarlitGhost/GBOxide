@@ -12,7 +12,7 @@ pub fn run(cartridge: Cartridge) -> Result<(), Box<Error>> {
     println!("read_rom_size: {}", cartridge.rom_data.len());
 
     let mut cpu = gameboy::cpu::CPU::new();
-    let mut mmu = gameboy::mmu::MMU::new(&cartridge);
+    let mut mmu = gameboy::mmu::MMU::new(cartridge);
 
     cpu.execute(&mut mmu)?;
 

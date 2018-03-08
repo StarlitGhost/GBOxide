@@ -7,7 +7,7 @@ pub struct MMU {
 }
 
 impl MMU {
-    pub fn new(cartridge: &Cartridge) -> MMU {
+    pub fn new(cartridge: Cartridge) -> MMU {
         MMU { cart_rom: cartridge.rom_data.into_boxed_slice() }
     }
 

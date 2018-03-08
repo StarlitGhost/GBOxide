@@ -65,7 +65,7 @@ impl Registers {
         }
     }
 
-    pub fn set_u16(&self, reg: Register16Bit, value: u16) {
+    pub fn set_u16(&mut self, reg: Register16Bit, value: u16) {
         use self::Register16Bit::*;
         match reg {
             AF => { self.a = (value >> 8) as u8; self.f = Flags::from_bits_truncate(value as u8) },
