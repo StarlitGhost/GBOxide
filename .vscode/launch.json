@@ -10,7 +10,10 @@
             "name": "Debug",
             "program": "${workspaceFolder}/target/debug/gboxide",
             "args": ["roms/tetris.gb"],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "env":{
+                "RUST_BACKTRACE": "1",
+            }
         }
     ]
 }

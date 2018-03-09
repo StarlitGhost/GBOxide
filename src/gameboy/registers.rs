@@ -17,14 +17,17 @@ impl Flags {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum Register8Bit {
     A, B, C, D, E, H, L
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum Register16Bit {
     AF, BC, DE, HL, SP
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct Registers {
     pub a: u8,
     pub f: Flags,

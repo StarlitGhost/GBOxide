@@ -6,6 +6,9 @@ use gameboy::registers::{
 use gameboy::registers::Register8Bit::{
     A, B, C, D, E, H, L
 };
+use gameboy::registers::Register16Bit::{
+    BC, DE, HL, SP
+};
 use gameboy::mmu::MMU;
 
 pub trait ReadU8 {
@@ -16,10 +19,25 @@ pub trait WriteU8 {
     fn write_u8(&self, cpu: &mut CPU, mmu: &mut MMU, value: u8);
 }
 
+pub trait ReadU16 {
+    fn read_u16(&self, cpu: &mut CPU, mmu: &MMU) -> u16;
+}
+
+pub trait WriteU16 {
+    fn write_u16(&self, cpu: &mut CPU, mmu: &mut MMU, value: u16);
+}
+
 pub struct NextU8;
 impl ReadU8 for NextU8 {
     fn read_u8(&self, cpu: &mut CPU, mmu: &MMU) -> u8 {
         cpu.next_u8(mmu)
+    }
+}
+
+pub struct NextU16;
+impl ReadU16 for NextU16 {
+    fn read_u16(&self, cpu: &mut CPU, mmu: &MMU) -> u16 {
+        cpu.next_u16(mmu)
     }
 }
 
@@ -53,21 +71,59 @@ impl WriteU8 for Register8Bit {
     }
 }
 
+impl ReadU16 for Register16Bit {
+    fn read_u16(&self, cpu: &mut CPU, _: &MMU) -> u16 {
+        use gameboy::registers::Register16Bit::*;
+        match *self {
+            AF | BC | DE | HL => cpu.r.get_u16(*self),
+            SP => cpu.r.sp,
+        }
+    }
+}
+
+impl WriteU16 for Register16Bit {
+    fn write_u16(&self, cpu: &mut CPU, _: &mut MMU, value: u16) {
+        use gameboy::registers::Register16Bit::*;
+        match *self {
+            AF | BC | DE | HL => cpu.r.set_u16(*self, value),
+            SP => cpu.r.sp = value,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub enum Address {
     BC, DE, HL, HLD, HLI, NextU16, HighRAM, HighRAMC
 }
 
 impl ReadU8 for Address {
     fn read_u8(&self, cpu: &mut CPU, mmu: &MMU) -> u8 {
-        let addr = cpu.get_address(mmu, self);
-        cpu.read_address(mmu, addr)
+        let address = cpu.get_address(mmu, self);
+        cpu.read_address(mmu, address)
     }
 }
 
 impl WriteU8 for Address {
     fn write_u8(&self, cpu: &mut CPU, mmu: &mut MMU, value: u8) {
-        let addr = cpu.get_address(mmu, self);
-        cpu.write_address(mmu, addr, value);
+        let address = cpu.get_address(mmu, self);
+        cpu.write_address(mmu, address, value);
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Condition {
+    NOTZERO, ZERO, NOTCARRY, CARRY
+}
+
+impl Condition {
+    fn check(&self, flags: Flags) -> bool {
+        use self::Condition::*;
+        match *self {
+            NOTZERO => !flags.contains(Flags::ZERO),
+            ZERO => flags.contains(Flags::ZERO),
+            NOTCARRY => !flags.contains(Flags::CARRY),
+            CARRY => flags.contains(Flags::CARRY),
+        }
     }
 }
 
@@ -81,8 +137,6 @@ impl CPU {
     }
 
     pub fn execute(&mut self, mmu: &mut MMU) -> Result<(), Box<Error>> {
-        println!("-- r.pc {:#06x}", self.r.pc);
-
         loop {
             let mut op = mmu.read_u8(self.r.pc);
             print!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
@@ -199,6 +253,11 @@ impl CPU {
                     0xAF => self.xor(mmu, A),
                     // JP
                     0xC3 => self.jp(mmu),
+                    // JR cc,n
+                    0x20 => self.jr_conditional(mmu, Condition::NOTZERO),
+                    0x28 => self.jr_conditional(mmu, Condition::ZERO),
+                    0x30 => self.jr_conditional(mmu, Condition::NOTCARRY),
+                    0x38 => self.jr_conditional(mmu, Condition::CARRY),
                     // Call
                     0xCD => self.call(mmu),
                     // RST
@@ -210,6 +269,13 @@ impl CPU {
                     0xEF => self.rst(mmu, 0x28),
                     0xF7 => self.rst(mmu, 0x30),
                     0xFF => self.rst(mmu, 0x38),
+                    // --- 16-bit ops ---
+                    // -- LD --
+                    // LD
+                    0x01 => self.ld16(mmu, BC, NextU16),
+                    0x11 => self.ld16(mmu, DE, NextU16),
+                    0x21 => self.ld16(mmu, HL, NextU16),
+                    0x31 => self.ld16(mmu, SP, NextU16),
                     _ => return Err(format!("unrecognized opcode {:#04x}", op).into())
                 };
             }
@@ -291,7 +357,15 @@ impl CPU {
         self.r.pc = address;
     }
 
-    // operations
+    fn jump(&mut self, _: &MMU, address: u16) {
+        self.r.pc = address;
+    }
+
+    fn jump_relative(&mut self, _: &MMU, offset: i8) {
+        self.r.pc = self.r.pc.wrapping_add(offset as u16);
+    }
+
+    // 8-bit operations
     fn ld<W: WriteU8, R: ReadU8>(&mut self, mmu: &mut MMU, w: W, r: R) {
         let value = r.read_u8(self, mmu);
         w.write_u8(self, mmu, value);
@@ -315,7 +389,7 @@ impl CPU {
 
     fn jp(&mut self, mmu: &MMU) {
         let address = self.next_u16(mmu);
-        self.r.pc = address;
+        self.jump(mmu, address);
     }
 
     fn call(&mut self, mmu: &mut MMU) {
@@ -331,5 +405,18 @@ impl CPU {
 
     fn ret(&mut self, mmu: &mut MMU) {
         self.r.pc = self.pop_u16(mmu);
+    }
+
+    fn jr_conditional(&mut self, mmu: &MMU, condition: Condition) {
+        let offset = self.next_u8(mmu) as i8;
+        if condition.check(self.r.f) {
+            self.jump_relative(mmu, offset);
+        }
+    }
+
+    // 16-bit operations
+    fn ld16<W: WriteU16, R: ReadU16>(&mut self, mmu: &mut MMU, w: W, r: R) {
+        let value = r.read_u16(self, mmu);
+        w.write_u16(self, mmu, value);
     }
 }
