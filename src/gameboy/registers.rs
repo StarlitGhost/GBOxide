@@ -1,3 +1,5 @@
+use std::fmt;
+
 bitflags!{
     pub struct Flags: u8 {
         const ZERO = 0x80;
@@ -62,8 +64,8 @@ impl Registers {
         match reg {
             AF => ((self.a as u16) << 8) | (self.f.bits() as u16),
             BC => ((self.b as u16) << 8) | (self.c as u16),
-            DE => ((self.b as u16) << 8) | (self.c as u16),
-            HL => ((self.b as u16) << 8) | (self.c as u16),
+            DE => ((self.d as u16) << 8) | (self.e as u16),
+            HL => ((self.h as u16) << 8) | (self.l as u16),
             SP => self.sp,
         }
     }
@@ -77,5 +79,20 @@ impl Registers {
             HL => { self.h = (value >> 8) as u8; self.l = value as u8; },
             SP => self.sp = value,
         }
+    }
+}
+
+impl fmt::Display for Registers {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "pc:{:04x} sp:{:04x} \
+                   a:{:02x} f:{:04b} \
+                   b:{:02x} c:{:02x} \
+                   d:{:02x} e:{:02x} \
+                   h:{:02x} l:{:02x}",
+                   self.pc, self.sp,
+                   self.a, self.f.bits() >> 4,
+                   self.b, self.c,
+                   self.d, self.e,
+                   self.h, self.l)
     }
 }

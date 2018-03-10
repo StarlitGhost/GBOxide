@@ -129,11 +129,15 @@ impl Condition {
 
 pub struct CPU {
     r: Registers,
+    interrupts: bool,
 }
 
 impl CPU {
     pub fn new() -> CPU {
-        CPU { r: Registers::new() }
+        CPU {
+            r: Registers::new(),
+            interrupts: true,
+        }
     }
 
     pub fn execute(&mut self, mmu: &mut MMU) -> Result<(), Box<Error>> {
@@ -176,6 +180,7 @@ impl CPU {
                     0x1A => self.ld(mmu, A, Address::DE),
                     0x7E => self.ld(mmu, A, Address::HL),
                     0xFA => self.ld(mmu, A, Address::NextU16),
+                    0xF0 => self.ld(mmu, A, Address::HighRAM),
                     0xF2 => self.ld(mmu, A, Address::HighRAMC),
                     0x3A => self.ld(mmu, A, Address::HLD),
                     0x2A => self.ld(mmu, A, Address::HLI),
@@ -183,6 +188,7 @@ impl CPU {
                     0x12 => self.ld(mmu, Address::DE, A),
                     0x77 => self.ld(mmu, Address::HL, A),
                     0xEA => self.ld(mmu, Address::NextU16, A),
+                    0xE0 => self.ld(mmu, Address::HighRAM, A),
                     0xE2 => self.ld(mmu, Address::HighRAMC, A),
                     0x32 => self.ld(mmu, Address::HLD, A),
                     0x22 => self.ld(mmu, Address::HLI, A),
@@ -269,6 +275,10 @@ impl CPU {
                     0xEF => self.rst(mmu, 0x28),
                     0xF7 => self.rst(mmu, 0x30),
                     0xFF => self.rst(mmu, 0x38),
+                    // DI
+                    0xF3 => self.di(mmu),
+                    // EI
+                    0xFB => self.ei(mmu),
                     // --- 16-bit ops ---
                     // -- LD --
                     // LD
@@ -279,7 +289,7 @@ impl CPU {
                     _ => return Err(format!("unrecognized opcode {:#04x}", op).into())
                 };
             }
-            println!("");
+            println!(" {}", self.r);
         }
 
         Ok(())
@@ -412,6 +422,14 @@ impl CPU {
         if condition.check(self.r.f) {
             self.jump_relative(mmu, offset);
         }
+    }
+
+    fn di(&mut self, _: &MMU) {
+        self.interrupts = false;
+    }
+
+    fn ei(&mut self, _: &MMU) {
+        self.interrupts = true;
     }
 
     // 16-bit operations

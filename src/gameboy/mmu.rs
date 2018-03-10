@@ -4,18 +4,24 @@ use cartridge::Cartridge;
 
 pub struct MMU {
     cart_rom: Box<[u8]>,
-    cart_ram: [u8; 0x1FFF],
-    system_ram: [u8; 0x1FFF],
+    cart_ram: [u8; 0x2000],
+    system_ram: [u8; 0x2000],
     high_ram: [u8; 0x7F],
+
+    interrupt_flag: u8,
+    interrupt_enable: u8,
 }
 
 impl MMU {
     pub fn new(cartridge: Cartridge) -> MMU {
         MMU {
             cart_rom: cartridge.rom_data.into_boxed_slice(),
-            cart_ram: [0x0; 0x1FFF],
-            system_ram: [0x0; 0x1FFF],
-            high_ram: [0x0; 0x7F]
+            cart_ram: [0x0; 0x2000],
+            system_ram: [0x0; 0x2000],
+            high_ram: [0x0; 0x7F],
+
+            interrupt_flag: 0x00,
+            interrupt_enable: 0x00,
         }
     }
 
@@ -27,7 +33,7 @@ impl MMU {
             0xC000 ... 0xDFFF => self.system_ram[(addr - 0xC000) as usize],
             0xE000 ... 0xFDFF => self.system_ram[(addr - 0xE000) as usize], // echo RAM
             0xFF80 ... 0xFFFE => self.high_ram[(addr & 0x7F) as usize],
-            _ => panic!("read from address {} is in an unimplemented memory region", addr),
+            _ => panic!("read from address {:#06x} is in an unimplemented memory region", addr),
         }
     }
 
@@ -40,10 +46,14 @@ impl MMU {
             0xE000 ... 0xFDFF => self.system_ram[(addr - 0xE000) as usize] = value, // echo RAM
             0xFE00 ... 0xFE9F => (), // object attribute memory, writes to this region draw sprites
             0xFEA0 ... 0xFEFF => (), // unusable
+            0xFF01 ... 0xFF02 => (), // serial port
+            0xFF0F => self.interrupt_flag = value,
             0xFF10 ... 0xFF26 => (), // 'NR' sound registers
             0xFF30 ... 0xFF3F => (), // wave pattern RAM
+            0xFF40 ... 0xFF4B => (), // GPU control registers
             0xFF4C ... 0xFF7F => (), // unusable
             0xFF80 ... 0xFFFE => self.high_ram[(addr & 0x007F) as usize] = value,
+            0xFFFF => self.interrupt_enable = value,
             _ => panic!("write to address {:#06x} is in an unimplemented memory region", addr),
         }
     }
