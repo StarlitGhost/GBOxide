@@ -8,6 +8,8 @@ pub struct MMU {
     system_ram: [u8; 0x2000],
     high_ram: [u8; 0x7F],
 
+    serial: u8,
+
     interrupt_flag: u8,
     interrupt_enable: u8,
 }
@@ -20,6 +22,8 @@ impl MMU {
             system_ram: [0x0; 0x2000],
             high_ram: [0x0; 0x7F],
 
+            serial: 0x00,
+
             interrupt_flag: 0x00,
             interrupt_enable: 0x00,
         }
@@ -28,10 +32,11 @@ impl MMU {
     pub fn read_u8(&self, addr: u16) -> u8 {
         match addr {
             0x0000 ... 0x3FFF => self.cart_rom[addr as usize],
-            0x4000 ... 0x7FFF => panic!("switchable ROM banks not yet implemented"),
+            0x4000 ... 0x7FFF => self.cart_rom[addr as usize], //panic!("switchable ROM banks not yet implemented"),
             0xA000 ... 0xBFFF => self.cart_ram[(addr - 0xA000) as usize],
             0xC000 ... 0xDFFF => self.system_ram[(addr - 0xC000) as usize],
             0xE000 ... 0xFDFF => self.system_ram[(addr - 0xE000) as usize], // echo RAM
+            0xFF40 ... 0xFF4B => 0xFF, // GPU control registers
             0xFF80 ... 0xFFFE => self.high_ram[(addr & 0x7F) as usize],
             _ => panic!("read from address {:#06x} is in an unimplemented memory region", addr),
         }
@@ -41,12 +46,19 @@ impl MMU {
         match addr {
             0x0000 ... 0x1FFF => (), // a write of 0x0A to this region enables system RAM. 0x00 disables
             0x4000 ... 0x7FFF => panic!("switchable ROM banks not yet implemented"),
+            0x8000 ... 0x97FF => (), // GPU character/tile RAM
+            0x9800 ... 0x9BFF => (), // GPU BG Map Data 1
+            0x9C00 ... 0x9FFF => (), // GPU BG Map Data 2
             0xA000 ... 0xBFFF => self.cart_ram[(addr - 0xA000) as usize] = value,
             0xC000 ... 0xDFFF => self.system_ram[(addr - 0xC000) as usize] = value,
             0xE000 ... 0xFDFF => self.system_ram[(addr - 0xE000) as usize] = value, // echo RAM
             0xFE00 ... 0xFE9F => (), // object attribute memory, writes to this region draw sprites
             0xFEA0 ... 0xFEFF => (), // unusable
-            0xFF01 ... 0xFF02 => (), // serial port
+            0xFF01 => self.serial = value, // serial data
+            0xFF02 => {
+                print!("{}", self.serial);
+                }, // serial IO control
+            0xFF05 ... 0xFF07 => (), // timer
             0xFF0F => self.interrupt_flag = value,
             0xFF10 ... 0xFF26 => (), // 'NR' sound registers
             0xFF30 ... 0xFF3F => (), // wave pattern RAM

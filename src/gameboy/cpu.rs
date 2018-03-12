@@ -7,7 +7,7 @@ use gameboy::registers::Register8Bit::{
     A, B, C, D, E, H, L
 };
 use gameboy::registers::Register16Bit::{
-    BC, DE, HL, SP
+    AF, BC, DE, HL, SP
 };
 use gameboy::mmu::MMU;
 
@@ -143,14 +143,31 @@ impl CPU {
     pub fn execute(&mut self, mmu: &mut MMU) -> Result<(), Box<Error>> {
         loop {
             let mut op = mmu.read_u8(self.r.pc);
-            print!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
+//            print!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
             self.r.pc = self.r.pc.wrapping_add(1);
             if op == 0xCB {
                 op = mmu.read_u8(self.r.pc);
                 self.r.pc = self.r.pc.wrapping_add(1);
 
                 match op {
-                    0x00 => (),
+                    // RLC
+                    0x07 => self.rlc(mmu, A),
+                    0x00 => self.rlc(mmu, B),
+                    0x01 => self.rlc(mmu, C),
+                    0x02 => self.rlc(mmu, D),
+                    0x03 => self.rlc(mmu, E),
+                    0x04 => self.rlc(mmu, H),
+                    0x05 => self.rlc(mmu, L),
+                    0x06 => self.rlc(mmu, Address::HL),
+                    // SRL
+                    0x3F => self.srl(mmu, A),
+                    0x38 => self.srl(mmu, B),
+                    0x39 => self.srl(mmu, C),
+                    0x3A => self.srl(mmu, D),
+                    0x3B => self.srl(mmu, E),
+                    0x3C => self.srl(mmu, H),
+                    0x3D => self.srl(mmu, L),
+                    0x3E => self.srl(mmu, Address::HL),
                     _ => return Err(format!("unrecognized CB opcode {:#04x}", op).into())
                 };
             } else {
@@ -255,17 +272,97 @@ impl CPU {
                     0x25 => self.dec(mmu, H),
                     0x2D => self.dec(mmu, L),
                     0x35 => self.dec(mmu, Address::HL),
+                    // INC
+                    0x3C => self.inc(mmu, A),
+                    0x04 => self.inc(mmu, B),
+                    0x0C => self.inc(mmu, C),
+                    0x14 => self.inc(mmu, D),
+                    0x1C => self.inc(mmu, E),
+                    0x24 => self.inc(mmu, H),
+                    0x2C => self.inc(mmu, L),
+                    0x34 => self.inc(mmu, Address::HL),
+                    // ADD
+                    0x87 => self.add(mmu, A),
+                    0x80 => self.add(mmu, B),
+                    0x81 => self.add(mmu, C),
+                    0x82 => self.add(mmu, D),
+                    0x83 => self.add(mmu, E),
+                    0x84 => self.add(mmu, H),
+                    0x85 => self.add(mmu, L),
+                    0x86 => self.add(mmu, Address::HL),
+                    0xC6 => self.add(mmu, NextU8),
+                    // SUB
+                    0x97 => self.add(mmu, A),
+                    0x90 => self.add(mmu, B),
+                    0x91 => self.add(mmu, C),
+                    0x92 => self.add(mmu, D),
+                    0x93 => self.add(mmu, E),
+                    0x94 => self.add(mmu, H),
+                    0x95 => self.add(mmu, L),
+                    0x96 => self.add(mmu, Address::HL),
+                    0xD6 => self.add(mmu, NextU8),
+                    // AND
+                    0xA7 => self.and(mmu, A),
+                    0xA0 => self.and(mmu, B),
+                    0xA1 => self.and(mmu, C),
+                    0xA2 => self.and(mmu, D),
+                    0xA3 => self.and(mmu, E),
+                    0xA4 => self.and(mmu, H),
+                    0xA5 => self.and(mmu, L),
+                    0xA6 => self.and(mmu, Address::HL),
+                    0xE6 => self.and(mmu, NextU8),
+                    // OR
+                    0xB7 => self.or(mmu, A),
+                    0xB0 => self.or(mmu, B),
+                    0xB1 => self.or(mmu, C),
+                    0xB2 => self.or(mmu, D),
+                    0xB3 => self.or(mmu, E),
+                    0xB4 => self.or(mmu, H),
+                    0xB5 => self.or(mmu, L),
+                    0xB6 => self.or(mmu, Address::HL),
+                    0xF6 => self.or(mmu, NextU8),
                     // XOR
                     0xAF => self.xor(mmu, A),
+                    0xA8 => self.xor(mmu, B),
+                    0xA9 => self.xor(mmu, C),
+                    0xAA => self.xor(mmu, D),
+                    0xAB => self.xor(mmu, E),
+                    0xAC => self.xor(mmu, H),
+                    0xAD => self.xor(mmu, L),
+                    0xAE => self.xor(mmu, Address::HL),
+                    0xEE => self.xor(mmu, NextU8),
+                    // CP
+                    0xBF => self.cp(mmu, A),
+                    0xB8 => self.cp(mmu, B),
+                    0xB9 => self.cp(mmu, C),
+                    0xBA => self.cp(mmu, D),
+                    0xBB => self.cp(mmu, E),
+                    0xBC => self.cp(mmu, H),
+                    0xBD => self.cp(mmu, L),
+                    0xBE => self.cp(mmu, Address::HL),
+                    0xFE => self.cp(mmu, NextU8),
                     // JP
-                    0xC3 => self.jp(mmu),
+                    0xC3 => self.jp(mmu, NextU16),
+                    0xE9 => self.jp(mmu, HL),
+                    // JP cc,nn
+                    0xC2 => self.jp_conditional(mmu, Condition::NOTZERO),
+                    0xCA => self.jp_conditional(mmu, Condition::ZERO),
+                    0xD2 => self.jp_conditional(mmu, Condition::NOTCARRY),
+                    0xDA => self.jp_conditional(mmu, Condition::CARRY),
+                    // JR
+                    0x18 => self.jr(mmu),
                     // JR cc,n
                     0x20 => self.jr_conditional(mmu, Condition::NOTZERO),
                     0x28 => self.jr_conditional(mmu, Condition::ZERO),
                     0x30 => self.jr_conditional(mmu, Condition::NOTCARRY),
                     0x38 => self.jr_conditional(mmu, Condition::CARRY),
-                    // Call
+                    // CALL
                     0xCD => self.call(mmu),
+                    // CALL cc
+                    0xC4 => self.call_conditional(mmu, Condition::NOTZERO),
+                    0xCC => self.call_conditional(mmu, Condition::ZERO),
+                    0xD4 => self.call_conditional(mmu, Condition::NOTCARRY),
+                    0xDC => self.call_conditional(mmu, Condition::CARRY),
                     // RST
                     0xC7 => self.rst(mmu, 0x00),
                     0xCF => self.rst(mmu, 0x08),
@@ -275,6 +372,15 @@ impl CPU {
                     0xEF => self.rst(mmu, 0x28),
                     0xF7 => self.rst(mmu, 0x30),
                     0xFF => self.rst(mmu, 0x38),
+                    // RET
+                    0xC9 => self.ret(mmu),
+                    // RETI
+                    0xD9 => self.reti(mmu),
+                    // RET cc
+                    0xC0 => self.ret_conditional(mmu, Condition::NOTZERO),
+                    0xC8 => self.ret_conditional(mmu, Condition::ZERO),
+                    0xD0 => self.ret_conditional(mmu, Condition::NOTCARRY),
+                    0xD8 => self.ret_conditional(mmu, Condition::CARRY),
                     // DI
                     0xF3 => self.di(mmu),
                     // EI
@@ -286,10 +392,30 @@ impl CPU {
                     0x11 => self.ld16(mmu, DE, NextU16),
                     0x21 => self.ld16(mmu, HL, NextU16),
                     0x31 => self.ld16(mmu, SP, NextU16),
+                    // PUSH
+                    0xF5 => self.push16(mmu, AF),
+                    0xC5 => self.push16(mmu, BC),
+                    0xD5 => self.push16(mmu, DE),
+                    0xE5 => self.push16(mmu, HL),
+                    // POP
+                    0xF1 => self.pop16(mmu, AF),
+                    0xC1 => self.pop16(mmu, BC),
+                    0xD1 => self.pop16(mmu, DE),
+                    0xE1 => self.pop16(mmu, HL),
+                    // INC
+                    0x03 => self.inc16(mmu, BC),
+                    0x13 => self.inc16(mmu, DE),
+                    0x23 => self.inc16(mmu, HL),
+                    0x33 => self.inc16(mmu, SP),
+                    // DEC
+                    0x0B => self.dec16(mmu, BC),
+                    0x1B => self.dec16(mmu, DE),
+                    0x2B => self.dec16(mmu, HL),
+                    0x3B => self.dec16(mmu, SP),
                     _ => return Err(format!("unrecognized opcode {:#04x}", op).into())
                 };
             }
-            println!(" {}", self.r);
+//            println!(" {}", self.r);
         }
 
         Ok(())
@@ -375,6 +501,10 @@ impl CPU {
         self.r.pc = self.r.pc.wrapping_add(offset as u16);
     }
 
+    fn return_op(&mut self, mmu: &mut MMU) {
+        self.r.pc = self.pop_u16(mmu);
+    }
+
     // 8-bit operations
     fn ld<W: WriteU8, R: ReadU8>(&mut self, mmu: &mut MMU, w: W, r: R) {
         let value = r.read_u8(self, mmu);
@@ -391,15 +521,71 @@ impl CPU {
         rw.write_u8(self, mmu, new_value);
     }
 
+    fn inc<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
+        let value = rw.read_u8(self, mmu);
+        let new_value = value.wrapping_add(1);
+        self.r.f = Flags::ZERO.check(new_value == 0) |
+                    Flags::HALFCARRY.check(value & 0xF == 0x0) |
+                    (Flags::CARRY & self.r.f);
+        rw.write_u8(self, mmu, new_value);
+    }
+
+    fn add<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+        let value = r.read_u8(self, mmu);
+        let (result, carry) = self.r.a.overflowing_add(value);
+        let half_carry = (self.r.a & 0x0F).checked_add(value | 0xF0).is_none();
+        self.r.f = Flags::ZERO.check(result == 0x0) |
+                    Flags::HALFCARRY.check(half_carry) |
+                    Flags::CARRY.check(carry);
+        self.r.a = result;
+    }
+
+    fn sub<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+        let value = r.read_u8(self, mmu);
+        let result = self.r.a.wrapping_sub(value);
+        self.r.f = Flags::ZERO.check(result == 0) |
+                    Flags::NEGATIVE |
+                    Flags::HALFCARRY.check((self.r.a & 0xF) < (value & 0xF)) |
+                    Flags::CARRY.check(self.r.a < value);
+        self.r.a = result;
+    }
+
+    fn and<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+        let value = r.read_u8(self, mmu);
+        self.r.a &= value;
+        self.r.f = Flags::ZERO.check(self.r.a == 0) |
+                    Flags::HALFCARRY;
+    }
+
+    fn or<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+        let value = r.read_u8(self, mmu);
+        self.r.a |= value;
+        self.r.f = Flags::ZERO.check(self.r.a == 0);
+    }
+
     fn xor<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
         let value = r.read_u8(self, mmu);
         self.r.a ^= value;
         self.r.f = Flags::ZERO.check(self.r.a == 0);
     }
 
-    fn jp(&mut self, mmu: &MMU) {
-        let address = self.next_u16(mmu);
+    fn cp<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+        let value = r.read_u8(self, mmu);
+        let result = self.r.a.wrapping_sub(value);
+        self.r.f = Flags::ZERO.check(result == 0) |
+                    Flags::NEGATIVE |
+                    Flags::HALFCARRY.check((self.r.a & 0xF) < (value & 0xF)) |
+                    Flags::CARRY.check(self.r.a < value);
+    }
+
+    fn jp<R: ReadU16>(&mut self, mmu: &MMU, r: R) {
+        let address = r.read_u16(self, mmu);
         self.jump(mmu, address);
+    }
+
+    fn jr(&mut self, mmu: &MMU) {
+        let offset = self.next_u8(mmu) as i8;
+        self.jump_relative(mmu, offset);
     }
 
     fn call(&mut self, mmu: &mut MMU) {
@@ -414,7 +600,14 @@ impl CPU {
     }
 
     fn ret(&mut self, mmu: &mut MMU) {
-        self.r.pc = self.pop_u16(mmu);
+        self.return_op(mmu);
+    }
+
+    fn jp_conditional(&mut self, mmu: &MMU, condition: Condition) {
+        let address = self.next_u16(mmu);
+        if condition.check(self.r.f) {
+            self.jump(mmu, address);
+        }
     }
 
     fn jr_conditional(&mut self, mmu: &MMU, condition: Condition) {
@@ -422,6 +615,24 @@ impl CPU {
         if condition.check(self.r.f) {
             self.jump_relative(mmu, offset);
         }
+    }
+
+    fn call_conditional(&mut self, mmu: &mut MMU, condition: Condition) {
+        let address = self.next_u16(mmu);
+        if condition.check(self.r.f) {
+            self.call_address(mmu, address);
+        }
+    }
+
+    fn ret_conditional(&mut self, mmu: &mut MMU, condition: Condition) {
+        if condition.check(self.r.f) {
+            self.return_op(mmu);
+        }
+    }
+
+    fn reti(&mut self, mmu: &mut MMU) {
+        self.interrupts = true;
+        self.return_op(mmu);
     }
 
     fn di(&mut self, _: &MMU) {
@@ -432,9 +643,53 @@ impl CPU {
         self.interrupts = true;
     }
 
+    fn rlc<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
+        let value = rw.read_u8(self, mmu);
+        let carried = value & 0x80;
+        let new_value = value.rotate_left(1);
+        self.r.f = Flags::ZERO.check(new_value == 0) |
+                    Flags::CARRY.check(carried != 0);
+        rw.write_u8(self, mmu, new_value);
+    }
+
+    fn rr<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
+        
+    }
+
+    fn srl<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
+        let value = rw.read_u8(self, mmu);
+        let carried = value & 0x1;
+        let new_value = value >> 1;
+        self.r.f = Flags::ZERO.check(new_value == 0) |
+                    Flags::CARRY.check(carried == 0x1);
+        rw.write_u8(self, mmu, new_value);
+    }
+
     // 16-bit operations
     fn ld16<W: WriteU16, R: ReadU16>(&mut self, mmu: &mut MMU, w: W, r: R) {
         let value = r.read_u16(self, mmu);
         w.write_u16(self, mmu, value);
+    }
+
+    fn push16<R: ReadU16>(&mut self, mmu: &mut MMU, r: R) {
+        let value = r.read_u16(self, mmu);
+        self.push_u16(mmu, value);
+    }
+
+    fn pop16<W: WriteU16>(&mut self, mmu: &mut MMU, w: W) {
+        let value = self.pop_u16(mmu);
+        w.write_u16(self, mmu, value);
+    }
+
+    fn inc16<RW: ReadU16+WriteU16>(&mut self, mmu: &mut MMU, rw: RW) {
+        let value = rw.read_u16(self, mmu);
+        let new_value = value.wrapping_add(1);
+        rw.write_u16(self, mmu, new_value);
+    }
+
+    fn dec16<RW: ReadU16+WriteU16>(&mut self, mmu: &mut MMU, rw: RW) {
+        let value = rw.read_u16(self, mmu);
+        let new_value = value.wrapping_sub(1);
+        rw.write_u16(self, mmu, new_value);
     }
 }

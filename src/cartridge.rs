@@ -1,5 +1,6 @@
 use std;
 use std::error::Error;
+use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::Cursor;
@@ -22,6 +23,33 @@ impl Cartridge {
         let header = Header::new(header_bytes)?;
 
         Ok(Cartridge { rom_data, header })
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum CartridgeType {
+    ROM  = 0x00, ROM_RAM  = 0x08, ROM_RAM_BATTERY  = 0x09,
+    MBC1 = 0x01, MBC1_RAM = 0x02, MBC1_RAM_BATTERY = 0x03,
+    MBC2 = 0x05,                  MBC2_RAM_BATTERY = 0x06,
+    MBC3 = 0x11, MBC3_RAM = 0x12, MBC3_RAM_BATTERY = 0x13,
+}
+
+impl fmt::Display for CartridgeType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::CartridgeType::*;
+        write!(f, "{}", match *self {
+            ROM => "ROM ONLY",
+            ROM_RAM => "ROM+RAM",
+            ROM_RAM_BATTERY => "ROM+RAM+BATTERY",
+            MBC1 => "MBC1",
+            MBC1_RAM => "MBC1+RAM",
+            MBC1_RAM_BATTERY => "MBC1+RAM+BATTERY",
+            MBC2 => "MBC2",
+            MBC2_RAM_BATTERY => "MBC2+RAM+BATTERY",
+            MBC3 => "MBC3",
+            MBC3_RAM => "MBC3+RAM",
+            MBC3_RAM_BATTERY => "MBC3+RAM+BATTERY",
+        })
     }
 }
 
@@ -49,7 +77,7 @@ pub struct Header {
     pub cgb_flag: bool,                 // shrug, enum? bool?
     pub licensee_code: String,
     pub sgb_flag: bool,
-    //pub cartridge_type: u8,           // enum of possible values?
+    pub cartridge_type: CartridgeType,
     pub rom_size: u32,                  // bytes
     pub ram_size: u32,                  // bytes
     pub japanese: bool,
@@ -109,6 +137,23 @@ impl Header {
             },
             false => Header::lookup_old_licensee_code(&raw_old_licensee_code)?.to_string(),
         };
+
+        use self::CartridgeType::*;
+        let cartridge_type = match raw_cartridge_type {
+            0x00 => ROM,
+            0x01 => MBC1,
+            0x02 => MBC1_RAM,
+            0x03 => MBC1_RAM_BATTERY,
+            0x05 => MBC2,
+            0x06 => MBC2_RAM_BATTERY,
+            0x08 => ROM_RAM,
+            0x09 => ROM_RAM_BATTERY,
+            0x11 => MBC3,
+            0x12 => MBC3_RAM,
+            0x13 => MBC3_RAM_BATTERY,
+            _ => return Err(format!("unknown cartridge_type {:#04x}", raw_cartridge_type).into()),
+        };
+
         let rom_size: u32 = (32 << (raw_rom_size & 0xf)) * 1024;
         let rom_size: u32 = rom_size + if raw_rom_size >> 4 == 0x5 { 1024 * 1024 } else { 0 };
         let ram_size: u32 = match raw_ram_size {
@@ -154,6 +199,7 @@ impl Header {
             cgb_flag,
             licensee_code,
             sgb_flag,
+            cartridge_type,
             rom_size,
             ram_size,
             japanese,
@@ -408,6 +454,7 @@ manufacturer_code: {:?}
 cgb_flag: {:?}
 licensee_code: {:?}
 sgb_flag: {:?}
+cartridge_type: {:?}
 rom_size: {:?}
 ram_size: {:?}
 japanese: {:?}
@@ -420,6 +467,7 @@ self.manufacturer_code,
 self.cgb_flag,
 self.licensee_code,
 self.sgb_flag,
+self.cartridge_type,
 self.rom_size,
 self.ram_size,
 self.japanese,
