@@ -55,9 +55,7 @@ impl MMU {
             0xFE00 ... 0xFE9F => (), // object attribute memory, writes to this region draw sprites
             0xFEA0 ... 0xFEFF => (), // unusable
             0xFF01 => self.serial = value, // serial data
-            0xFF02 => {
-                print!("{}", self.serial);
-                }, // serial IO control
+            0xFF02 => { print!("{}", self.serial as char); }, // serial IO control
             0xFF05 ... 0xFF07 => (), // timer
             0xFF0F => self.interrupt_flag = value,
             0xFF10 ... 0xFF26 => (), // 'NR' sound registers

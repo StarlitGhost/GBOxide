@@ -159,6 +159,15 @@ impl CPU {
                     0x04 => self.rlc(mmu, H),
                     0x05 => self.rlc(mmu, L),
                     0x06 => self.rlc(mmu, Address::HL),
+                    // RR
+                    0x1F => self.rr(mmu, A),
+                    0x18 => self.rr(mmu, B),
+                    0x19 => self.rr(mmu, C),
+                    0x1A => self.rr(mmu, D),
+                    0x1B => self.rr(mmu, E),
+                    0x1C => self.rr(mmu, H),
+                    0x1D => self.rr(mmu, L),
+                    0x1E => self.rr(mmu, Address::HL),
                     // SRL
                     0x3F => self.srl(mmu, A),
                     0x38 => self.srl(mmu, B),
@@ -291,16 +300,26 @@ impl CPU {
                     0x85 => self.add(mmu, L),
                     0x86 => self.add(mmu, Address::HL),
                     0xC6 => self.add(mmu, NextU8),
+                    // ADC
+                    0x8F => self.adc(mmu, A),
+                    0x88 => self.adc(mmu, B),
+                    0x89 => self.adc(mmu, C),
+                    0x8A => self.adc(mmu, D),
+                    0x8B => self.adc(mmu, E),
+                    0x8C => self.adc(mmu, H),
+                    0x8D => self.adc(mmu, L),
+                    0x8E => self.adc(mmu, Address::HL),
+                    0xCF => self.adc(mmu, NextU8),
                     // SUB
-                    0x97 => self.add(mmu, A),
-                    0x90 => self.add(mmu, B),
-                    0x91 => self.add(mmu, C),
-                    0x92 => self.add(mmu, D),
-                    0x93 => self.add(mmu, E),
-                    0x94 => self.add(mmu, H),
-                    0x95 => self.add(mmu, L),
-                    0x96 => self.add(mmu, Address::HL),
-                    0xD6 => self.add(mmu, NextU8),
+                    0x97 => self.sub(mmu, A),
+                    0x90 => self.sub(mmu, B),
+                    0x91 => self.sub(mmu, C),
+                    0x92 => self.sub(mmu, D),
+                    0x93 => self.sub(mmu, E),
+                    0x94 => self.sub(mmu, H),
+                    0x95 => self.sub(mmu, L),
+                    0x96 => self.sub(mmu, Address::HL),
+                    0xD6 => self.sub(mmu, NextU8),
                     // AND
                     0xA7 => self.and(mmu, A),
                     0xA0 => self.and(mmu, B),
@@ -385,6 +404,8 @@ impl CPU {
                     0xF3 => self.di(mmu),
                     // EI
                     0xFB => self.ei(mmu),
+                    // RRA
+                    0x1F => self.rr(mmu, A),
                     // --- 16-bit ops ---
                     // -- LD --
                     // LD
@@ -540,6 +561,11 @@ impl CPU {
         self.r.a = result;
     }
 
+    fn adc<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+        let value = r.read_u8(self, mmu);
+
+    }
+
     fn sub<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
         let value = r.read_u8(self, mmu);
         let result = self.r.a.wrapping_sub(value);
@@ -653,7 +679,12 @@ impl CPU {
     }
 
     fn rr<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
-        
+        let value = rw.read_u8(self, mmu);
+        let prev_carried = if self.r.f.contains(Flags::CARRY) { 1 } else { 0 };
+        let carried = value & 0x01;
+        let new_value = (value >> 1) | (prev_carried << 7);
+        self.r.f = Flags::ZERO.check(new_value == 0) |
+                    Flags::CARRY.check(carried != 0);
     }
 
     fn srl<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
