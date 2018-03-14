@@ -233,70 +233,200 @@ impl CPU {
                     0x3D => self.srl(mmu, L),
                     0x3E => self.srl(mmu, Address::HL),
                     // BIT
-                    0x47 => self.bit(mmu, 0, A), 
-                    0x40 => self.bit(mmu, 0, B), 
-                    0x41 => self.bit(mmu, 0, C), 
-                    0x42 => self.bit(mmu, 0, D), 
-                    0x43 => self.bit(mmu, 0, E), 
-                    0x44 => self.bit(mmu, 0, H), 
-                    0x45 => self.bit(mmu, 0, L), 
-                    0x46 => self.bit(mmu, 0, Address::HL), 
-                    0x4F => self.bit(mmu, 1, A), 
-                    0x48 => self.bit(mmu, 1, B), 
-                    0x49 => self.bit(mmu, 1, C), 
-                    0x4A => self.bit(mmu, 1, D), 
-                    0x4B => self.bit(mmu, 1, E), 
-                    0x4C => self.bit(mmu, 1, H), 
-                    0x4D => self.bit(mmu, 1, L), 
-                    0x4E => self.bit(mmu, 1, Address::HL), 
-                    0x57 => self.bit(mmu, 2, A), 
-                    0x50 => self.bit(mmu, 2, B), 
-                    0x51 => self.bit(mmu, 2, C), 
-                    0x52 => self.bit(mmu, 2, D), 
-                    0x53 => self.bit(mmu, 2, E), 
-                    0x54 => self.bit(mmu, 2, H), 
-                    0x55 => self.bit(mmu, 2, L), 
-                    0x56 => self.bit(mmu, 2, Address::HL), 
-                    0x5F => self.bit(mmu, 3, A), 
-                    0x58 => self.bit(mmu, 3, B), 
-                    0x59 => self.bit(mmu, 3, C), 
-                    0x5A => self.bit(mmu, 3, D), 
-                    0x5B => self.bit(mmu, 3, E), 
-                    0x5C => self.bit(mmu, 3, H), 
-                    0x5D => self.bit(mmu, 3, L), 
-                    0x5E => self.bit(mmu, 3, Address::HL), 
-                    0x67 => self.bit(mmu, 4, A), 
-                    0x60 => self.bit(mmu, 4, B), 
-                    0x61 => self.bit(mmu, 4, C), 
-                    0x62 => self.bit(mmu, 4, D), 
-                    0x63 => self.bit(mmu, 4, E), 
-                    0x64 => self.bit(mmu, 4, H), 
-                    0x65 => self.bit(mmu, 4, L), 
-                    0x66 => self.bit(mmu, 4, Address::HL), 
-                    0x6F => self.bit(mmu, 5, A), 
-                    0x68 => self.bit(mmu, 5, B), 
-                    0x69 => self.bit(mmu, 5, C), 
-                    0x6A => self.bit(mmu, 5, D), 
-                    0x6B => self.bit(mmu, 5, E), 
-                    0x6C => self.bit(mmu, 5, H), 
-                    0x6D => self.bit(mmu, 5, L), 
-                    0x6E => self.bit(mmu, 5, Address::HL), 
-                    0x77 => self.bit(mmu, 6, A), 
-                    0x70 => self.bit(mmu, 6, B), 
-                    0x71 => self.bit(mmu, 6, C), 
-                    0x72 => self.bit(mmu, 6, D), 
-                    0x73 => self.bit(mmu, 6, E), 
-                    0x74 => self.bit(mmu, 6, H), 
-                    0x75 => self.bit(mmu, 6, L), 
-                    0x76 => self.bit(mmu, 6, Address::HL), 
-                    0x7F => self.bit(mmu, 7, A), 
-                    0x78 => self.bit(mmu, 7, B), 
-                    0x79 => self.bit(mmu, 7, C), 
-                    0x7A => self.bit(mmu, 7, D), 
-                    0x7B => self.bit(mmu, 7, E), 
-                    0x7C => self.bit(mmu, 7, H), 
-                    0x7D => self.bit(mmu, 7, L), 
-                    0x7E => self.bit(mmu, 7, Address::HL), 
+                    0x47 => self.bit(mmu, 0, A),
+                    0x40 => self.bit(mmu, 0, B),
+                    0x41 => self.bit(mmu, 0, C),
+                    0x42 => self.bit(mmu, 0, D),
+                    0x43 => self.bit(mmu, 0, E),
+                    0x44 => self.bit(mmu, 0, H),
+                    0x45 => self.bit(mmu, 0, L),
+                    0x46 => self.bit(mmu, 0, Address::HL),
+                    0x4F => self.bit(mmu, 1, A),
+                    0x48 => self.bit(mmu, 1, B),
+                    0x49 => self.bit(mmu, 1, C),
+                    0x4A => self.bit(mmu, 1, D),
+                    0x4B => self.bit(mmu, 1, E),
+                    0x4C => self.bit(mmu, 1, H),
+                    0x4D => self.bit(mmu, 1, L),
+                    0x4E => self.bit(mmu, 1, Address::HL),
+                    0x57 => self.bit(mmu, 2, A),
+                    0x50 => self.bit(mmu, 2, B),
+                    0x51 => self.bit(mmu, 2, C),
+                    0x52 => self.bit(mmu, 2, D),
+                    0x53 => self.bit(mmu, 2, E),
+                    0x54 => self.bit(mmu, 2, H),
+                    0x55 => self.bit(mmu, 2, L),
+                    0x56 => self.bit(mmu, 2, Address::HL),
+                    0x5F => self.bit(mmu, 3, A),
+                    0x58 => self.bit(mmu, 3, B),
+                    0x59 => self.bit(mmu, 3, C),
+                    0x5A => self.bit(mmu, 3, D),
+                    0x5B => self.bit(mmu, 3, E),
+                    0x5C => self.bit(mmu, 3, H),
+                    0x5D => self.bit(mmu, 3, L),
+                    0x5E => self.bit(mmu, 3, Address::HL),
+                    0x67 => self.bit(mmu, 4, A),
+                    0x60 => self.bit(mmu, 4, B),
+                    0x61 => self.bit(mmu, 4, C),
+                    0x62 => self.bit(mmu, 4, D),
+                    0x63 => self.bit(mmu, 4, E),
+                    0x64 => self.bit(mmu, 4, H),
+                    0x65 => self.bit(mmu, 4, L),
+                    0x66 => self.bit(mmu, 4, Address::HL),
+                    0x6F => self.bit(mmu, 5, A),
+                    0x68 => self.bit(mmu, 5, B),
+                    0x69 => self.bit(mmu, 5, C),
+                    0x6A => self.bit(mmu, 5, D),
+                    0x6B => self.bit(mmu, 5, E),
+                    0x6C => self.bit(mmu, 5, H),
+                    0x6D => self.bit(mmu, 5, L),
+                    0x6E => self.bit(mmu, 5, Address::HL),
+                    0x77 => self.bit(mmu, 6, A),
+                    0x70 => self.bit(mmu, 6, B),
+                    0x71 => self.bit(mmu, 6, C),
+                    0x72 => self.bit(mmu, 6, D),
+                    0x73 => self.bit(mmu, 6, E),
+                    0x74 => self.bit(mmu, 6, H),
+                    0x75 => self.bit(mmu, 6, L),
+                    0x76 => self.bit(mmu, 6, Address::HL),
+                    0x7F => self.bit(mmu, 7, A),
+                    0x78 => self.bit(mmu, 7, B),
+                    0x79 => self.bit(mmu, 7, C),
+                    0x7A => self.bit(mmu, 7, D),
+                    0x7B => self.bit(mmu, 7, E),
+                    0x7C => self.bit(mmu, 7, H),
+                    0x7D => self.bit(mmu, 7, L),
+                    0x7E => self.bit(mmu, 7, Address::HL),
+                    // SET
+                    0xC7 => self.set(mmu, 0, A),
+                    0xC0 => self.set(mmu, 0, B),
+                    0xC1 => self.set(mmu, 0, C),
+                    0xC2 => self.set(mmu, 0, D),
+                    0xC3 => self.set(mmu, 0, E),
+                    0xC4 => self.set(mmu, 0, H),
+                    0xC5 => self.set(mmu, 0, L),
+                    0xC6 => self.set(mmu, 0, Address::HL),
+                    0xCF => self.set(mmu, 1, A),
+                    0xC8 => self.set(mmu, 1, B),
+                    0xC9 => self.set(mmu, 1, C),
+                    0xCA => self.set(mmu, 1, D),
+                    0xCB => self.set(mmu, 1, E),
+                    0xCC => self.set(mmu, 1, H),
+                    0xCD => self.set(mmu, 1, L),
+                    0xCE => self.set(mmu, 1, Address::HL),
+                    0xD7 => self.set(mmu, 2, A),
+                    0xD0 => self.set(mmu, 2, B),
+                    0xD1 => self.set(mmu, 2, C),
+                    0xD2 => self.set(mmu, 2, D),
+                    0xD3 => self.set(mmu, 2, E),
+                    0xD4 => self.set(mmu, 2, H),
+                    0xD5 => self.set(mmu, 2, L),
+                    0xD6 => self.set(mmu, 2, Address::HL),
+                    0xDF => self.set(mmu, 3, A),
+                    0xD8 => self.set(mmu, 3, B),
+                    0xD9 => self.set(mmu, 3, C),
+                    0xDA => self.set(mmu, 3, D),
+                    0xDB => self.set(mmu, 3, E),
+                    0xDC => self.set(mmu, 3, H),
+                    0xDD => self.set(mmu, 3, L),
+                    0xDE => self.set(mmu, 3, Address::HL),
+                    0xE7 => self.set(mmu, 4, A),
+                    0xE0 => self.set(mmu, 4, B),
+                    0xE1 => self.set(mmu, 4, C),
+                    0xE2 => self.set(mmu, 4, D),
+                    0xE3 => self.set(mmu, 4, E),
+                    0xE4 => self.set(mmu, 4, H),
+                    0xE5 => self.set(mmu, 4, L),
+                    0xE6 => self.set(mmu, 4, Address::HL),
+                    0xEF => self.set(mmu, 5, A),
+                    0xE8 => self.set(mmu, 5, B),
+                    0xE9 => self.set(mmu, 5, C),
+                    0xEA => self.set(mmu, 5, D),
+                    0xEB => self.set(mmu, 5, E),
+                    0xEC => self.set(mmu, 5, H),
+                    0xED => self.set(mmu, 5, L),
+                    0xEE => self.set(mmu, 5, Address::HL),
+                    0xF7 => self.set(mmu, 6, A),
+                    0xF0 => self.set(mmu, 6, B),
+                    0xF1 => self.set(mmu, 6, C),
+                    0xF2 => self.set(mmu, 6, D),
+                    0xF3 => self.set(mmu, 6, E),
+                    0xF4 => self.set(mmu, 6, H),
+                    0xF5 => self.set(mmu, 6, L),
+                    0xF6 => self.set(mmu, 6, Address::HL),
+                    0xFF => self.set(mmu, 7, A),
+                    0xF8 => self.set(mmu, 7, B),
+                    0xF9 => self.set(mmu, 7, C),
+                    0xFA => self.set(mmu, 7, D),
+                    0xFB => self.set(mmu, 7, E),
+                    0xFC => self.set(mmu, 7, H),
+                    0xFD => self.set(mmu, 7, L),
+                    0xFE => self.set(mmu, 7, Address::HL),
+                    // RES
+                    0x87 => self.res(mmu, 0, A),
+                    0x80 => self.res(mmu, 0, B),
+                    0x81 => self.res(mmu, 0, C),
+                    0x82 => self.res(mmu, 0, D),
+                    0x83 => self.res(mmu, 0, E),
+                    0x84 => self.res(mmu, 0, H),
+                    0x85 => self.res(mmu, 0, L),
+                    0x86 => self.res(mmu, 0, Address::HL),
+                    0x8F => self.res(mmu, 1, A),
+                    0x88 => self.res(mmu, 1, B),
+                    0x89 => self.res(mmu, 1, C),
+                    0x8A => self.res(mmu, 1, D),
+                    0x8B => self.res(mmu, 1, E),
+                    0x8C => self.res(mmu, 1, H),
+                    0x8D => self.res(mmu, 1, L),
+                    0x8E => self.res(mmu, 1, Address::HL),
+                    0x97 => self.res(mmu, 2, A),
+                    0x90 => self.res(mmu, 2, B),
+                    0x91 => self.res(mmu, 2, C),
+                    0x92 => self.res(mmu, 2, D),
+                    0x93 => self.res(mmu, 2, E),
+                    0x94 => self.res(mmu, 2, H),
+                    0x95 => self.res(mmu, 2, L),
+                    0x96 => self.res(mmu, 2, Address::HL),
+                    0x9F => self.res(mmu, 3, A),
+                    0x98 => self.res(mmu, 3, B),
+                    0x99 => self.res(mmu, 3, C),
+                    0x9A => self.res(mmu, 3, D),
+                    0x9B => self.res(mmu, 3, E),
+                    0x9C => self.res(mmu, 3, H),
+                    0x9D => self.res(mmu, 3, L),
+                    0x9E => self.res(mmu, 3, Address::HL),
+                    0xA7 => self.res(mmu, 4, A),
+                    0xA0 => self.res(mmu, 4, B),
+                    0xA1 => self.res(mmu, 4, C),
+                    0xA2 => self.res(mmu, 4, D),
+                    0xA3 => self.res(mmu, 4, E),
+                    0xA4 => self.res(mmu, 4, H),
+                    0xA5 => self.res(mmu, 4, L),
+                    0xA6 => self.res(mmu, 4, Address::HL),
+                    0xAF => self.res(mmu, 5, A),
+                    0xA8 => self.res(mmu, 5, B),
+                    0xA9 => self.res(mmu, 5, C),
+                    0xAA => self.res(mmu, 5, D),
+                    0xAB => self.res(mmu, 5, E),
+                    0xAC => self.res(mmu, 5, H),
+                    0xAD => self.res(mmu, 5, L),
+                    0xAE => self.res(mmu, 5, Address::HL),
+                    0xB7 => self.res(mmu, 6, A),
+                    0xB0 => self.res(mmu, 6, B),
+                    0xB1 => self.res(mmu, 6, C),
+                    0xB2 => self.res(mmu, 6, D),
+                    0xB3 => self.res(mmu, 6, E),
+                    0xB4 => self.res(mmu, 6, H),
+                    0xB5 => self.res(mmu, 6, L),
+                    0xB6 => self.res(mmu, 6, Address::HL),
+                    0xBF => self.res(mmu, 7, A),
+                    0xB8 => self.res(mmu, 7, B),
+                    0xB9 => self.res(mmu, 7, C),
+                    0xBA => self.res(mmu, 7, D),
+                    0xBB => self.res(mmu, 7, E),
+                    0xBC => self.res(mmu, 7, H),
+                    0xBD => self.res(mmu, 7, L),
+                    0xBE => self.res(mmu, 7, Address::HL),
                     _ => return Err(format!("unrecognized CB opcode {:#04x}", op).into())
                 };
             } else {
@@ -534,6 +664,8 @@ impl CPU {
                     0xC8 => self.ret_conditional(mmu, Condition::ZERO),
                     0xD0 => self.ret_conditional(mmu, Condition::NOTCARRY),
                     0xD8 => self.ret_conditional(mmu, Condition::CARRY),
+                    // DAA
+                    0x27 => self.daa(mmu),
                     // CPL
                     0x2F => self.cpl(mmu),
                     // CCF
@@ -557,6 +689,8 @@ impl CPU {
                     0x31 => self.ld16(mmu, SP, NextU16),
                     0x08 => self.ld16(mmu, Address::NextU16, SP),
                     0xF9 => self.ld16(mmu, SP, HL),
+                    // LDHL SP,n
+                    0xF8 => self.ld16_sp_n(mmu),
                     // PUSH
                     0xF5 => self.push16(mmu, AF),
                     0xC5 => self.push16(mmu, BC),
@@ -911,6 +1045,18 @@ impl CPU {
                     (Flags::CARRY & self.r.f);
     }
 
+    fn set<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, bit: u8, rw: RW) {
+        let value = rw.read_u8(self, mmu);
+        let new_value = value | (1 << bit);
+        rw.write_u8(self, mmu, new_value);
+    }
+
+    fn res<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, bit: u8, rw: RW) {
+        let value = rw.read_u8(self, mmu);
+        let new_value = value & !(1 << bit);
+        rw.write_u8(self, mmu, new_value);
+    }
+
     fn swap<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
         let value = rw.read_u8(self, mmu);
         let high = value >> 4;
@@ -918,6 +1064,33 @@ impl CPU {
         let new_value = (low << 4) | high;
         self.r.f = Flags::ZERO.check(new_value == 0);
         rw.write_u8(self, mmu, new_value);
+    }
+
+    fn daa(&mut self, _: &MMU) {
+        let mut a = self.r.a;
+        let negative = self.r.f.contains(Flags::NEGATIVE);
+        let half_carry = self.r.f.contains(Flags::HALFCARRY);
+        let mut carry = self.r.f.contains(Flags::CARRY);
+        if negative {
+            if carry || a > 0x99 {
+                a = a.wrapping_add(0x60);
+                carry = true;
+            }
+            if half_carry || (a & 0x0F) > 0x09 {
+                a = a.wrapping_add(0x6);
+            }
+        } else {
+            if carry {
+                a = a.wrapping_sub(0x60);
+            }
+            if half_carry {
+                a = a.wrapping_sub(0x6);
+            }
+        }
+        self.r.f = Flags::ZERO.check(a == 0) |
+                    (Flags::NEGATIVE & self.r.f) |
+                    Flags::CARRY.check(carry);
+        self.r.a = a;
     }
 
     fn cpl(&mut self, _: &MMU) {
@@ -942,6 +1115,15 @@ impl CPU {
     fn ld16<W: WriteU16, R: ReadU16>(&mut self, mmu: &mut MMU, w: W, r: R) {
         let value = r.read_u16(self, mmu);
         w.write_u16(self, mmu, value);
+    }
+
+    fn ld16_sp_n(&mut self, mmu: &MMU) {
+        let sp = self.r.get_u16(Register16Bit::SP);
+        let value = self.next_u8(mmu) as i8 as i16 as u16;
+        let result = sp.wrapping_add(value);
+        self.r.f = Flags::HALFCARRY.check((sp & 0xF) + (value & 0xF) > 0xF) |
+                    Flags::CARRY.check((sp & 0xFF) + (value & 0xFF) > 0xFF);
+        self.r.set_u16(Register16Bit::HL, result);
     }
 
     fn push16<R: ReadU16>(&mut self, mmu: &mut MMU, r: R) {
