@@ -110,6 +110,16 @@ impl WriteU8 for Address {
     }
 }
 
+impl WriteU16 for Address {
+    fn write_u16(&self, cpu: &mut CPU, mmu: &mut MMU, value: u16) {
+        let address = cpu.get_address(mmu, self);
+        let high = (value >> 8) as u8;
+        let low = value as u8;
+        cpu.write_address(mmu, address, low);
+        cpu.write_address(mmu, address + 1, high);
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum Condition {
     NOTZERO, ZERO, NOTCARRY, CARRY
@@ -150,6 +160,15 @@ impl CPU {
                 self.r.pc = self.r.pc.wrapping_add(1);
 
                 match op {
+                    // SWAP
+                    0x37 => self.swap(mmu, A),
+                    0x30 => self.swap(mmu, B),
+                    0x31 => self.swap(mmu, C),
+                    0x32 => self.swap(mmu, D),
+                    0x33 => self.swap(mmu, E),
+                    0x34 => self.swap(mmu, H),
+                    0x35 => self.swap(mmu, L),
+                    0x36 => self.swap(mmu, Address::HL),
                     // RLC
                     0x07 => self.rlc(mmu, A),
                     0x00 => self.rlc(mmu, B),
@@ -309,7 +328,7 @@ impl CPU {
                     0x8C => self.adc(mmu, H),
                     0x8D => self.adc(mmu, L),
                     0x8E => self.adc(mmu, Address::HL),
-                    0xCF => self.adc(mmu, NextU8),
+                    0xCE => self.adc(mmu, NextU8),
                     // SUB
                     0x97 => self.sub(mmu, A),
                     0x90 => self.sub(mmu, B),
@@ -360,6 +379,10 @@ impl CPU {
                     0xBD => self.cp(mmu, L),
                     0xBE => self.cp(mmu, Address::HL),
                     0xFE => self.cp(mmu, NextU8),
+                    // DI
+                    0xF3 => self.di(mmu),
+                    // EI
+                    0xFB => self.ei(mmu),
                     // JP
                     0xC3 => self.jp(mmu, NextU16),
                     0xE9 => self.jp(mmu, HL),
@@ -400,10 +423,6 @@ impl CPU {
                     0xC8 => self.ret_conditional(mmu, Condition::ZERO),
                     0xD0 => self.ret_conditional(mmu, Condition::NOTCARRY),
                     0xD8 => self.ret_conditional(mmu, Condition::CARRY),
-                    // DI
-                    0xF3 => self.di(mmu),
-                    // EI
-                    0xFB => self.ei(mmu),
                     // RRA
                     0x1F => self.rr(mmu, A),
                     // --- 16-bit ops ---
@@ -413,6 +432,8 @@ impl CPU {
                     0x11 => self.ld16(mmu, DE, NextU16),
                     0x21 => self.ld16(mmu, HL, NextU16),
                     0x31 => self.ld16(mmu, SP, NextU16),
+                    0x08 => self.ld16(mmu, Address::NextU16, SP),
+                    0xF9 => self.ld16(mmu, SP, HL),
                     // PUSH
                     0xF5 => self.push16(mmu, AF),
                     0xC5 => self.push16(mmu, BC),
@@ -433,6 +454,13 @@ impl CPU {
                     0x1B => self.dec16(mmu, DE),
                     0x2B => self.dec16(mmu, HL),
                     0x3B => self.dec16(mmu, SP),
+                    // ADD HL,n
+                    0x09 => self.add16_hl(mmu, BC),
+                    0x19 => self.add16_hl(mmu, DE),
+                    0x29 => self.add16_hl(mmu, HL),
+                    0x39 => self.add16_hl(mmu, SP),
+                    // ADD SP,n
+                    0xE8 => self.add16_sp(mmu),
                     _ => return Err(format!("unrecognized opcode {:#04x}", op).into())
                 };
             }
@@ -554,8 +582,8 @@ impl CPU {
     fn add<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
         let value = r.read_u8(self, mmu);
         let (result, carry) = self.r.a.overflowing_add(value);
-        let half_carry = (self.r.a & 0x0F).checked_add(value | 0xF0).is_none();
-        self.r.f = Flags::ZERO.check(result == 0x0) |
+        let half_carry = (self.r.a & 0xF) + (value & 0xF) > 0xF;
+        self.r.f = Flags::ZERO.check(result == 0) |
                     Flags::HALFCARRY.check(half_carry) |
                     Flags::CARRY.check(carry);
         self.r.a = result;
@@ -563,7 +591,14 @@ impl CPU {
 
     fn adc<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
         let value = r.read_u8(self, mmu);
-
+        let carried = if self.r.f.contains(Flags::CARRY) { 1 } else { 0 };
+        let result = self.r.a.wrapping_add(value).wrapping_add(carried);
+        let carry = self.r.a as u16 + value as u16 + carried as u16 > 0xFF;
+        let half_carry = (self.r.a & 0xF) + (value & 0xF) + carried > 0xF;
+        self.r.f = Flags::ZERO.check(result == 0) |
+                    Flags::HALFCARRY.check(half_carry) |
+                    Flags::CARRY.check(carry);
+        self.r.a = result;
     }
 
     fn sub<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
@@ -696,6 +731,15 @@ impl CPU {
         rw.write_u8(self, mmu, new_value);
     }
 
+    fn swap<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
+        let value = rw.read_u8(self, mmu);
+        let high = value >> 4;
+        let low = value & 0xF;
+        let new_value = (low << 4) | high;
+        self.r.f = Flags::ZERO.check(new_value == 0);
+        rw.write_u8(self, mmu, new_value);
+    }
+
     // 16-bit operations
     fn ld16<W: WriteU16, R: ReadU16>(&mut self, mmu: &mut MMU, w: W, r: R) {
         let value = r.read_u16(self, mmu);
@@ -722,5 +766,26 @@ impl CPU {
         let value = rw.read_u16(self, mmu);
         let new_value = value.wrapping_sub(1);
         rw.write_u16(self, mmu, new_value);
+    }
+
+    fn add16_hl<R: ReadU16>(&mut self, mmu: &MMU, r: R) {
+        let hl = self.r.get_u16(Register16Bit::HL);
+        let value = r.read_u16(self, mmu);
+        let new_value = hl.wrapping_add(value);
+        let mask = (1u16 << 11).wrapping_sub(1);
+        let half_carry = (hl & mask) + (value & mask) > mask;
+        self.r.f = (Flags::ZERO & self.r.f) |
+                    Flags::HALFCARRY.check(half_carry) |
+                    Flags::CARRY.check(hl > 0xFFFF - value);
+        self.r.set_u16(Register16Bit::HL, new_value);
+    }
+
+    fn add16_sp(&mut self, mmu: &MMU) {
+        let sp = self.r.get_u16(Register16Bit::SP);
+        let value = self.next_u8(mmu) as i8 as i16 as u16;
+        let result = sp.wrapping_add(value);
+        self.r.f = Flags::HALFCARRY.check((sp & 0xF) + (value & 0xF) > 0xF) |
+                    Flags::CARRY.check((sp & 0xFF) + (value & 0xFF) > 0xFF);
+        self.r.set_u16(Register16Bit::SP, result);
     }
 }
