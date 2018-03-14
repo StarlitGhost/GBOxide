@@ -232,6 +232,71 @@ impl CPU {
                     0x3C => self.srl(mmu, H),
                     0x3D => self.srl(mmu, L),
                     0x3E => self.srl(mmu, Address::HL),
+                    // BIT
+                    0x47 => self.bit(mmu, 0, A), 
+                    0x40 => self.bit(mmu, 0, B), 
+                    0x41 => self.bit(mmu, 0, C), 
+                    0x42 => self.bit(mmu, 0, D), 
+                    0x43 => self.bit(mmu, 0, E), 
+                    0x44 => self.bit(mmu, 0, H), 
+                    0x45 => self.bit(mmu, 0, L), 
+                    0x46 => self.bit(mmu, 0, Address::HL), 
+                    0x4F => self.bit(mmu, 1, A), 
+                    0x48 => self.bit(mmu, 1, B), 
+                    0x49 => self.bit(mmu, 1, C), 
+                    0x4A => self.bit(mmu, 1, D), 
+                    0x4B => self.bit(mmu, 1, E), 
+                    0x4C => self.bit(mmu, 1, H), 
+                    0x4D => self.bit(mmu, 1, L), 
+                    0x4E => self.bit(mmu, 1, Address::HL), 
+                    0x57 => self.bit(mmu, 2, A), 
+                    0x50 => self.bit(mmu, 2, B), 
+                    0x51 => self.bit(mmu, 2, C), 
+                    0x52 => self.bit(mmu, 2, D), 
+                    0x53 => self.bit(mmu, 2, E), 
+                    0x54 => self.bit(mmu, 2, H), 
+                    0x55 => self.bit(mmu, 2, L), 
+                    0x56 => self.bit(mmu, 2, Address::HL), 
+                    0x5F => self.bit(mmu, 3, A), 
+                    0x58 => self.bit(mmu, 3, B), 
+                    0x59 => self.bit(mmu, 3, C), 
+                    0x5A => self.bit(mmu, 3, D), 
+                    0x5B => self.bit(mmu, 3, E), 
+                    0x5C => self.bit(mmu, 3, H), 
+                    0x5D => self.bit(mmu, 3, L), 
+                    0x5E => self.bit(mmu, 3, Address::HL), 
+                    0x67 => self.bit(mmu, 4, A), 
+                    0x60 => self.bit(mmu, 4, B), 
+                    0x61 => self.bit(mmu, 4, C), 
+                    0x62 => self.bit(mmu, 4, D), 
+                    0x63 => self.bit(mmu, 4, E), 
+                    0x64 => self.bit(mmu, 4, H), 
+                    0x65 => self.bit(mmu, 4, L), 
+                    0x66 => self.bit(mmu, 4, Address::HL), 
+                    0x6F => self.bit(mmu, 5, A), 
+                    0x68 => self.bit(mmu, 5, B), 
+                    0x69 => self.bit(mmu, 5, C), 
+                    0x6A => self.bit(mmu, 5, D), 
+                    0x6B => self.bit(mmu, 5, E), 
+                    0x6C => self.bit(mmu, 5, H), 
+                    0x6D => self.bit(mmu, 5, L), 
+                    0x6E => self.bit(mmu, 5, Address::HL), 
+                    0x77 => self.bit(mmu, 6, A), 
+                    0x70 => self.bit(mmu, 6, B), 
+                    0x71 => self.bit(mmu, 6, C), 
+                    0x72 => self.bit(mmu, 6, D), 
+                    0x73 => self.bit(mmu, 6, E), 
+                    0x74 => self.bit(mmu, 6, H), 
+                    0x75 => self.bit(mmu, 6, L), 
+                    0x76 => self.bit(mmu, 6, Address::HL), 
+                    0x7F => self.bit(mmu, 7, A), 
+                    0x78 => self.bit(mmu, 7, B), 
+                    0x79 => self.bit(mmu, 7, C), 
+                    0x7A => self.bit(mmu, 7, D), 
+                    0x7B => self.bit(mmu, 7, E), 
+                    0x7C => self.bit(mmu, 7, H), 
+                    0x7D => self.bit(mmu, 7, L), 
+                    0x7E => self.bit(mmu, 7, Address::HL), 
                     _ => return Err(format!("unrecognized CB opcode {:#04x}", op).into())
                 };
             } else {
@@ -836,6 +901,14 @@ impl CPU {
         self.r.f = Flags::ZERO.check(new_value == 0) |
                     Flags::CARRY.check(carried == 0x1);
         rw.write_u8(self, mmu, new_value);
+    }
+
+    fn bit<R: ReadU8>(&mut self, mmu: &MMU, bit: u8, r: R) {
+        let value = r.read_u8(self, mmu);
+        let mask = 1 << bit;
+        self.r.f = Flags::ZERO.check((value & mask) == 0) |
+                    Flags::HALFCARRY |
+                    (Flags::CARRY & self.r.f);
     }
 
     fn swap<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
