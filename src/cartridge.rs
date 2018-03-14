@@ -26,6 +26,7 @@ impl Cartridge {
     }
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Debug)]
 pub enum CartridgeType {
     ROM  = 0x00, ROM_RAM  = 0x08, ROM_RAM_BATTERY  = 0x09,

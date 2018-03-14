@@ -178,6 +178,24 @@ impl CPU {
                     0x04 => self.rlc(mmu, H),
                     0x05 => self.rlc(mmu, L),
                     0x06 => self.rlc(mmu, Address::HL),
+                    // RL
+                    0x17 => self.rl(mmu, A),
+                    0x10 => self.rl(mmu, B),
+                    0x11 => self.rl(mmu, C),
+                    0x12 => self.rl(mmu, D),
+                    0x13 => self.rl(mmu, E),
+                    0x14 => self.rl(mmu, H),
+                    0x15 => self.rl(mmu, L),
+                    0x16 => self.rl(mmu, Address::HL),
+                    // RRC
+                    0x0F => self.rrc(mmu, A),
+                    0x08 => self.rrc(mmu, B),
+                    0x09 => self.rrc(mmu, C),
+                    0x0A => self.rrc(mmu, D),
+                    0x0B => self.rrc(mmu, E),
+                    0x0C => self.rrc(mmu, H),
+                    0x0D => self.rrc(mmu, L),
+                    0x0E => self.rrc(mmu, Address::HL),
                     // RR
                     0x1F => self.rr(mmu, A),
                     0x18 => self.rr(mmu, B),
@@ -187,6 +205,24 @@ impl CPU {
                     0x1C => self.rr(mmu, H),
                     0x1D => self.rr(mmu, L),
                     0x1E => self.rr(mmu, Address::HL),
+                    // SLA
+                    0x27 => self.sla(mmu, A),
+                    0x20 => self.sla(mmu, B),
+                    0x21 => self.sla(mmu, C),
+                    0x22 => self.sla(mmu, D),
+                    0x23 => self.sla(mmu, E),
+                    0x24 => self.sla(mmu, H),
+                    0x25 => self.sla(mmu, L),
+                    0x26 => self.sla(mmu, Address::HL),
+                    // SRA
+                    0x2F => self.sra(mmu, A),
+                    0x28 => self.sra(mmu, B),
+                    0x29 => self.sra(mmu, C),
+                    0x2A => self.sra(mmu, D),
+                    0x2B => self.sra(mmu, E),
+                    0x2C => self.sra(mmu, H),
+                    0x2D => self.sra(mmu, L),
+                    0x2E => self.sra(mmu, Address::HL),
                     // SRL
                     0x3F => self.srl(mmu, A),
                     0x38 => self.srl(mmu, B),
@@ -339,6 +375,16 @@ impl CPU {
                     0x95 => self.sub(mmu, L),
                     0x96 => self.sub(mmu, Address::HL),
                     0xD6 => self.sub(mmu, NextU8),
+                    // SBC
+                    0x9F => self.sbc(mmu, A),
+                    0x98 => self.sbc(mmu, B),
+                    0x99 => self.sbc(mmu, C),
+                    0x9A => self.sbc(mmu, D),
+                    0x9B => self.sbc(mmu, E),
+                    0x9C => self.sbc(mmu, H),
+                    0x9D => self.sbc(mmu, L),
+                    0x9E => self.sbc(mmu, Address::HL),
+                    0xDE => self.sbc(mmu, NextU8),
                     // AND
                     0xA7 => self.and(mmu, A),
                     0xA0 => self.and(mmu, B),
@@ -423,6 +469,18 @@ impl CPU {
                     0xC8 => self.ret_conditional(mmu, Condition::ZERO),
                     0xD0 => self.ret_conditional(mmu, Condition::NOTCARRY),
                     0xD8 => self.ret_conditional(mmu, Condition::CARRY),
+                    // CPL
+                    0x2F => self.cpl(mmu),
+                    // CCF
+                    0x3F => self.ccf(mmu),
+                    // SCF
+                    0x37 => self.scf(mmu),
+                    // RLCA
+                    0x07 => self.rlc(mmu, A),
+                    // RLA
+                    0x17 => self.rl(mmu, A),
+                    // RRCA
+                    0x0F => self.rrc(mmu, A),
                     // RRA
                     0x1F => self.rr(mmu, A),
                     // --- 16-bit ops ---
@@ -466,8 +524,6 @@ impl CPU {
             }
 //            println!(" {}", self.r);
         }
-
-        Ok(())
     }
 
     fn next_u8(&mut self, mmu: &MMU) -> u8 {
@@ -611,6 +667,19 @@ impl CPU {
         self.r.a = result;
     }
 
+    fn sbc<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+        let value = r.read_u8(self, mmu);
+        let carried = if self.r.f.contains(Flags::CARRY) { 1 } else { 0 };
+        let result = self.r.a.wrapping_sub(value).wrapping_sub(carried);
+        let half_carry = (self.r.a & 0xF) < (value & 0xF) + carried;
+        let carry = (self.r.a as u16) < (value as u16) + (carried as u16);
+        self.r.f = Flags::ZERO.check(result == 0) |
+                    Flags::NEGATIVE |
+                    Flags::HALFCARRY.check(half_carry) |
+                    Flags::CARRY.check(carry);
+        self.r.a = result;
+    }
+
     fn and<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
         let value = r.read_u8(self, mmu);
         self.r.a &= value;
@@ -713,6 +782,25 @@ impl CPU {
         rw.write_u8(self, mmu, new_value);
     }
 
+    fn rl<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
+        let value = rw.read_u8(self, mmu);
+        let prev_carried = if self.r.f.contains(Flags::CARRY) { 1 } else { 0 };
+        let carried = value & 0x80;
+        let new_value = (value << 1) | prev_carried;
+        self.r.f = Flags::ZERO.check(new_value == 0) |
+                    Flags::CARRY.check(carried != 0);
+        rw.write_u8(self, mmu, new_value);
+    }
+
+    fn rrc<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
+        let value = rw.read_u8(self, mmu);
+        let carried = value & 0x01;
+        let new_value = value.rotate_right(1);
+        self.r.f = Flags::ZERO.check(new_value == 0) |
+                    Flags::CARRY.check(carried != 0);
+        rw.write_u8(self, mmu, new_value);
+    }
+
     fn rr<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
         let value = rw.read_u8(self, mmu);
         let prev_carried = if self.r.f.contains(Flags::CARRY) { 1 } else { 0 };
@@ -720,6 +808,25 @@ impl CPU {
         let new_value = (value >> 1) | (prev_carried << 7);
         self.r.f = Flags::ZERO.check(new_value == 0) |
                     Flags::CARRY.check(carried != 0);
+        rw.write_u8(self, mmu, new_value);
+    }
+
+    fn sla<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
+        let value = rw.read_u8(self, mmu);
+        let carried = value & 0x80;
+        let new_value = value << 1;
+        self.r.f = Flags::ZERO.check(new_value == 0) |
+                    Flags::CARRY.check(carried != 0);
+        rw.write_u8(self, mmu, new_value);
+    }
+
+    fn sra<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
+        let value = rw.read_u8(self, mmu);
+        let carried = value & 0x01;
+        let new_value = (value & 0x80) | value >> 1;
+        self.r.f = Flags::ZERO.check(new_value == 0) |
+                    Flags::CARRY.check(carried != 0);
+        rw.write_u8(self, mmu, new_value);
     }
 
     fn srl<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW) {
@@ -738,6 +845,24 @@ impl CPU {
         let new_value = (low << 4) | high;
         self.r.f = Flags::ZERO.check(new_value == 0);
         rw.write_u8(self, mmu, new_value);
+    }
+
+    fn cpl(&mut self, _: &MMU) {
+        self.r.a = !self.r.a;
+        self.r.f = (Flags::ZERO & self.r.f) |
+                    Flags::NEGATIVE |
+                    Flags::HALFCARRY |
+                    (Flags::CARRY & self.r.f);
+    }
+
+    fn ccf(&mut self, _: &MMU) {
+        self.r.f = (Flags::ZERO & self.r.f) |
+                    (!(Flags::CARRY & self.r.f) & Flags::CARRY);
+    }
+
+    fn scf(&mut self, _: &MMU) {
+        self.r.f = (Flags::ZERO & self.r.f) |
+                    Flags::CARRY;
     }
 
     // 16-bit operations
