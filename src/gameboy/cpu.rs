@@ -1071,7 +1071,7 @@ impl CPU {
         let negative = self.r.f.contains(Flags::NEGATIVE);
         let half_carry = self.r.f.contains(Flags::HALFCARRY);
         let mut carry = self.r.f.contains(Flags::CARRY);
-        if negative {
+        if !negative {
             if carry || a > 0x99 {
                 a = a.wrapping_add(0x60);
                 carry = true;
