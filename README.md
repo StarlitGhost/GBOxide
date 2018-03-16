@@ -1,4 +1,4 @@
-# GBOxide
+# GBOxide [![Build Status](https://travis-ci.org/StarlitGhost/GBOxide.svg?branch=master)](https://travis-ci.org/StarlitGhost/GBOxide)
 A GameBoy Emulator written in Rust
 
 ## References
