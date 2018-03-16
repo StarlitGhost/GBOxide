@@ -12,6 +12,8 @@ pub struct MMU {
 
     interrupt_flag: u8,
     interrupt_enable: u8,
+
+    cycles: u32,
 }
 
 impl MMU {
@@ -26,6 +28,8 @@ impl MMU {
 
             interrupt_flag: 0x00,
             interrupt_enable: 0x00,
+
+            cycles: 0,
         }
     }
 
@@ -36,8 +40,10 @@ impl MMU {
             0xA000 ... 0xBFFF => self.cart_ram[(addr - 0xA000) as usize],
             0xC000 ... 0xDFFF => self.system_ram[(addr - 0xC000) as usize],
             0xE000 ... 0xFDFF => self.system_ram[(addr - 0xE000) as usize], // echo RAM
+            0xFF0F => self.interrupt_flag,
             0xFF40 ... 0xFF4B => 0xFF, // GPU control registers
             0xFF80 ... 0xFFFE => self.high_ram[(addr & 0x7F) as usize],
+            0xFFFF => self.interrupt_enable,
             _ => panic!("read from address {:#06x} is in an unimplemented memory region", addr),
         }
     }
@@ -57,11 +63,15 @@ impl MMU {
             0xFF01 => self.serial = value, // serial data
             0xFF02 => { print!("{}", self.serial as char); }, // serial IO control
             0xFF05 ... 0xFF07 => (), // timer
+            0xFF08 ... 0xFF0E => (), // unusable
             0xFF0F => self.interrupt_flag = value,
             0xFF10 ... 0xFF26 => (), // 'NR' sound registers
+            0xFF27 ... 0xFF29 => (), // unusable
             0xFF30 ... 0xFF3F => (), // wave pattern RAM
             0xFF40 ... 0xFF4B => (), // GPU control registers
-            0xFF4C ... 0xFF7F => (), // unusable
+            0xFF4C ... 0xFF4F => (), // unusable
+            0xFF50 => (), // boot rom disable
+            0xFF51 ... 0xFF7F => (), // unusable
             0xFF80 ... 0xFFFE => self.high_ram[(addr & 0x007F) as usize] = value,
             0xFFFF => self.interrupt_enable = value,
             _ => panic!("write to address {:#06x} is in an unimplemented memory region", addr),
