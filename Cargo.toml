@@ -7,3 +7,6 @@ authors = ["StarlitGhost <36834781+StarlitGhost@users.noreply.github.com>"]
 bitflags = "1.0.1"
 byteorder = "1"
 clap = {version = "2.30", features = ["yaml"]}
+glium = "0.20"
+imgui = "0.0.18"
+imgui-glium-renderer = "0.0.18"

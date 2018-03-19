@@ -12,7 +12,7 @@ use gameboy::registers::Register16Bit::{
 use gameboy::mmu::MMU;
 
 pub trait ReadU8 {
-    fn read_u8(&self, cpu: &mut CPU, mmu: &MMU) -> u8;
+    fn read_u8(&self, cpu: &mut CPU, mmu: &mut MMU) -> u8;
 }
 
 pub trait WriteU8 {
@@ -20,7 +20,7 @@ pub trait WriteU8 {
 }
 
 pub trait ReadU16 {
-    fn read_u16(&self, cpu: &mut CPU, mmu: &MMU) -> u16;
+    fn read_u16(&self, cpu: &mut CPU, mmu: &mut MMU) -> u16;
 }
 
 pub trait WriteU16 {
@@ -29,20 +29,20 @@ pub trait WriteU16 {
 
 pub struct NextU8;
 impl ReadU8 for NextU8 {
-    fn read_u8(&self, cpu: &mut CPU, mmu: &MMU) -> u8 {
+    fn read_u8(&self, cpu: &mut CPU, mmu: &mut MMU) -> u8 {
         cpu.next_u8(mmu)
     }
 }
 
 pub struct NextU16;
 impl ReadU16 for NextU16 {
-    fn read_u16(&self, cpu: &mut CPU, mmu: &MMU) -> u16 {
+    fn read_u16(&self, cpu: &mut CPU, mmu: &mut MMU) -> u16 {
         cpu.next_u16(mmu)
     }
 }
 
 impl ReadU8 for Register8Bit {
-    fn read_u8(&self, cpu: &mut CPU, _: &MMU) -> u8 {
+    fn read_u8(&self, cpu: &mut CPU, _: &mut MMU) -> u8 {
         use gameboy::registers::Register8Bit::*;
         match *self {
             A => cpu.r.a,
@@ -72,7 +72,7 @@ impl WriteU8 for Register8Bit {
 }
 
 impl ReadU16 for Register16Bit {
-    fn read_u16(&self, cpu: &mut CPU, _: &MMU) -> u16 {
+    fn read_u16(&self, cpu: &mut CPU, _: &mut MMU) -> u16 {
         use gameboy::registers::Register16Bit::*;
         match *self {
             AF | BC | DE | HL => cpu.r.get_u16(*self),
@@ -97,7 +97,7 @@ pub enum Address {
 }
 
 impl ReadU8 for Address {
-    fn read_u8(&self, cpu: &mut CPU, mmu: &MMU) -> u8 {
+    fn read_u8(&self, cpu: &mut CPU, mmu: &mut MMU) -> u8 {
         let address = cpu.get_address(mmu, self);
         cpu.read_address(mmu, address)
     }
@@ -137,26 +137,45 @@ impl Condition {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum InterruptStatus {
+    Disabled, Enabling, Enabled
+}
+
 pub struct CPU {
     r: Registers,
-    interrupts: bool,
+    interrupts: InterruptStatus,
+    halted: bool,
 }
 
 impl CPU {
     pub fn new() -> CPU {
         CPU {
             r: Registers::new(),
-            interrupts: true,
+            interrupts: InterruptStatus::Enabled,
+            halted: false,
         }
     }
 
     pub fn execute(&mut self, mmu: &mut MMU) -> Result<(), Box<Error>> {
         loop {
-            let mut op = mmu.read_u8(self.r.pc);
+            if self.halted {
+                continue;
+            }
+            let op = mmu.read_u8(self.r.pc);
 //            print!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
+            let interrupt = match self.interrupts {
+                InterruptStatus::Enabled => false, // TODO: actual interrupts
+                InterruptStatus::Enabling => {
+                    self.interrupts = InterruptStatus::Enabled;
+                    false
+                },
+                InterruptStatus::Disabled => false
+            };
+            // TODO: interrupt handling
             self.r.pc = self.r.pc.wrapping_add(1);
             if op == 0xCB {
-                op = mmu.read_u8(self.r.pc);
+                let op = mmu.read_u8(self.r.pc);
                 self.r.pc = self.r.pc.wrapping_add(1);
 
                 match op {
@@ -431,8 +450,6 @@ impl CPU {
                 };
             } else {
                 match op {
-                    // NOP
-                    0x00 => (),
                     // --- 8-bit ops ---
                     // -- LD --
                     // LD nn,n
@@ -620,10 +637,32 @@ impl CPU {
                     0x25 => self.dec(mmu, H),
                     0x2D => self.dec(mmu, L),
                     0x35 => self.dec(mmu, Address::HL),
+                    // DAA
+                    0x27 => self.daa(mmu),
+                    // CPL
+                    0x2F => self.cpl(mmu),
+                    // CCF
+                    0x3F => self.ccf(mmu),
+                    // SCF
+                    0x37 => self.scf(mmu),
+                    // NOP
+                    0x00 => (),
+                    // HALT
+                    0x76 => self.halt(mmu),
+                    // STOP
+                    0x10 => self.stop(mmu),
                     // DI
                     0xF3 => self.di(mmu),
                     // EI
                     0xFB => self.ei(mmu),
+                    // RLCA
+                    0x07 => self.rlc(mmu, A, false),
+                    // RLA
+                    0x17 => self.rl(mmu, A, false),
+                    // RRCA
+                    0x0F => self.rrc(mmu, A, false),
+                    // RRA
+                    0x1F => self.rr(mmu, A, false),
                     // JP
                     0xC3 => self.jp(mmu, NextU16),
                     0xE9 => self.jp(mmu, HL),
@@ -657,29 +696,13 @@ impl CPU {
                     0xFF => self.rst(mmu, 0x38),
                     // RET
                     0xC9 => self.ret(mmu),
-                    // RETI
-                    0xD9 => self.reti(mmu),
                     // RET cc
                     0xC0 => self.ret_conditional(mmu, Condition::NOTZERO),
                     0xC8 => self.ret_conditional(mmu, Condition::ZERO),
                     0xD0 => self.ret_conditional(mmu, Condition::NOTCARRY),
                     0xD8 => self.ret_conditional(mmu, Condition::CARRY),
-                    // DAA
-                    0x27 => self.daa(mmu),
-                    // CPL
-                    0x2F => self.cpl(mmu),
-                    // CCF
-                    0x3F => self.ccf(mmu),
-                    // SCF
-                    0x37 => self.scf(mmu),
-                    // RLCA
-                    0x07 => self.rlc(mmu, A, false),
-                    // RLA
-                    0x17 => self.rl(mmu, A, false),
-                    // RRCA
-                    0x0F => self.rrc(mmu, A, false),
-                    // RRA
-                    0x1F => self.rr(mmu, A, false),
+                    // RETI
+                    0xD9 => self.reti(mmu),
                     // --- 16-bit ops ---
                     // -- LD --
                     // LD
@@ -725,13 +748,13 @@ impl CPU {
         }
     }
 
-    fn next_u8(&mut self, mmu: &MMU) -> u8 {
+    fn next_u8(&mut self, mmu: &mut MMU) -> u8 {
         let address = self.r.pc;
         self.r.pc = self.r.pc.wrapping_add(1);
         self.read_address(mmu, address)
     }
 
-    fn next_u16(&mut self, mmu: &MMU) -> u16 {
+    fn next_u16(&mut self, mmu: &mut MMU) -> u16 {
         let low = self.next_u8(mmu);
         let high = self.next_u8(mmu);
         ((high as u16) << 8) | (low as u16)
@@ -759,7 +782,7 @@ impl CPU {
         ((high as u16) << 8) | (low as u16)
     }
 
-    fn get_address(&mut self, mmu: &MMU, address: &Address) -> u16 {
+    fn get_address(&mut self, mmu: &mut MMU, address: &Address) -> u16 {
         use self::Address::*;
         match *address {
             BC => self.r.get_u16(Register16Bit::BC),
@@ -783,7 +806,7 @@ impl CPU {
         }
     }
 
-    fn read_address(&self, mmu: &MMU, address: u16) -> u8 {
+    fn read_address(&self, mmu: &mut MMU, address: u16) -> u8 {
         mmu.read_u8(address)
     }
 
@@ -815,7 +838,7 @@ impl CPU {
         w.write_u8(self, mmu, value);
     }
 
-    fn add<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+    fn add<R: ReadU8>(&mut self, mmu: &mut MMU, r: R) {
         let value = r.read_u8(self, mmu);
         let (result, carry) = self.r.a.overflowing_add(value);
         let half_carry = (self.r.a & 0xF) + (value & 0xF) > 0xF;
@@ -825,7 +848,7 @@ impl CPU {
         self.r.a = result;
     }
 
-    fn adc<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+    fn adc<R: ReadU8>(&mut self, mmu: &mut MMU, r: R) {
         let value = r.read_u8(self, mmu);
         let carried = if self.r.f.contains(Flags::CARRY) { 1 } else { 0 };
         let result = self.r.a.wrapping_add(value).wrapping_add(carried);
@@ -837,7 +860,7 @@ impl CPU {
         self.r.a = result;
     }
 
-    fn sub<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+    fn sub<R: ReadU8>(&mut self, mmu: &mut MMU, r: R) {
         let value = r.read_u8(self, mmu);
         let result = self.r.a.wrapping_sub(value);
         self.r.f = Flags::ZERO.check(result == 0) |
@@ -847,7 +870,7 @@ impl CPU {
         self.r.a = result;
     }
 
-    fn sbc<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+    fn sbc<R: ReadU8>(&mut self, mmu: &mut MMU, r: R) {
         let value = r.read_u8(self, mmu);
         let carried = if self.r.f.contains(Flags::CARRY) { 1 } else { 0 };
         let result = self.r.a.wrapping_sub(value).wrapping_sub(carried);
@@ -860,26 +883,26 @@ impl CPU {
         self.r.a = result;
     }
 
-    fn and<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+    fn and<R: ReadU8>(&mut self, mmu: &mut MMU, r: R) {
         let value = r.read_u8(self, mmu);
         self.r.a &= value;
         self.r.f = Flags::ZERO.check(self.r.a == 0) |
                     Flags::HALFCARRY;
     }
 
-    fn or<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+    fn or<R: ReadU8>(&mut self, mmu: &mut MMU, r: R) {
         let value = r.read_u8(self, mmu);
         self.r.a |= value;
         self.r.f = Flags::ZERO.check(self.r.a == 0);
     }
 
-    fn xor<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+    fn xor<R: ReadU8>(&mut self, mmu: &mut MMU, r: R) {
         let value = r.read_u8(self, mmu);
         self.r.a ^= value;
         self.r.f = Flags::ZERO.check(self.r.a == 0);
     }
 
-    fn cp<R: ReadU8>(&mut self, mmu: &MMU, r: R) {
+    fn cp<R: ReadU8>(&mut self, mmu: &mut MMU, r: R) {
         let value = r.read_u8(self, mmu);
         let result = self.r.a.wrapping_sub(value);
         self.r.f = Flags::ZERO.check(result == 0) |
@@ -907,12 +930,12 @@ impl CPU {
         rw.write_u8(self, mmu, new_value);
     }
 
-    fn jp<R: ReadU16>(&mut self, mmu: &MMU, r: R) {
+    fn jp<R: ReadU16>(&mut self, mmu: &mut MMU, r: R) {
         let address = r.read_u16(self, mmu);
         self.jump(mmu, address);
     }
 
-    fn jr(&mut self, mmu: &MMU) {
+    fn jr(&mut self, mmu: &mut MMU) {
         let offset = self.next_u8(mmu) as i8;
         self.jump_relative(mmu, offset);
     }
@@ -932,14 +955,14 @@ impl CPU {
         self.return_op(mmu);
     }
 
-    fn jp_conditional(&mut self, mmu: &MMU, condition: Condition) {
+    fn jp_conditional(&mut self, mmu: &mut MMU, condition: Condition) {
         let address = self.next_u16(mmu);
         if condition.check(self.r.f) {
             self.jump(mmu, address);
         }
     }
 
-    fn jr_conditional(&mut self, mmu: &MMU, condition: Condition) {
+    fn jr_conditional(&mut self, mmu: &mut MMU, condition: Condition) {
         let offset = self.next_u8(mmu) as i8;
         if condition.check(self.r.f) {
             self.jump_relative(mmu, offset);
@@ -960,16 +983,19 @@ impl CPU {
     }
 
     fn reti(&mut self, mmu: &mut MMU) {
-        self.interrupts = true;
+        self.interrupts = InterruptStatus::Enabling;
         self.return_op(mmu);
     }
 
     fn di(&mut self, _: &MMU) {
-        self.interrupts = false;
+        self.interrupts = InterruptStatus::Disabled;
     }
 
     fn ei(&mut self, _: &MMU) {
-        self.interrupts = true;
+        self.interrupts = match self.interrupts {
+            InterruptStatus::Disabled => InterruptStatus::Enabling,
+            _ => self.interrupts,
+        }
     }
 
     fn rlc<RW: ReadU8+WriteU8>(&mut self, mmu: &mut MMU, rw: RW, cb: bool) {
@@ -1037,7 +1063,7 @@ impl CPU {
         rw.write_u8(self, mmu, new_value);
     }
 
-    fn bit<R: ReadU8>(&mut self, mmu: &MMU, bit: u8, r: R) {
+    fn bit<R: ReadU8>(&mut self, mmu: &mut MMU, bit: u8, r: R) {
         let value = r.read_u8(self, mmu);
         let mask = 1 << bit;
         self.r.f = Flags::ZERO.check((value & mask) == 0) |
@@ -1111,13 +1137,22 @@ impl CPU {
                     Flags::CARRY;
     }
 
+    fn halt(&mut self, _: &MMU) {
+        self.halted = true;
+    }
+
+    fn stop(&mut self, mmu: &mut MMU) {
+        self.halt(mmu);
+        self.next_u8(mmu);
+    }
+
     // 16-bit operations
     fn ld16<W: WriteU16, R: ReadU16>(&mut self, mmu: &mut MMU, w: W, r: R) {
         let value = r.read_u16(self, mmu);
         w.write_u16(self, mmu, value);
     }
 
-    fn ld16_sp_n(&mut self, mmu: &MMU) {
+    fn ld16_sp_n(&mut self, mmu: &mut MMU) {
         let sp = self.r.get_u16(Register16Bit::SP);
         let value = self.next_u8(mmu) as i8 as i16 as u16;
         let result = sp.wrapping_add(value);
@@ -1148,7 +1183,7 @@ impl CPU {
         rw.write_u16(self, mmu, new_value);
     }
 
-    fn add16_hl<R: ReadU16>(&mut self, mmu: &MMU, r: R) {
+    fn add16_hl<R: ReadU16>(&mut self, mmu: &mut MMU, r: R) {
         let hl = self.r.get_u16(Register16Bit::HL);
         let value = r.read_u16(self, mmu);
         let new_value = hl.wrapping_add(value);
@@ -1160,7 +1195,7 @@ impl CPU {
         self.r.set_u16(Register16Bit::HL, new_value);
     }
 
-    fn add16_sp(&mut self, mmu: &MMU) {
+    fn add16_sp(&mut self, mmu: &mut MMU) {
         let sp = self.r.get_u16(Register16Bit::SP);
         let value = self.next_u8(mmu) as i8 as i16 as u16;
         let result = sp.wrapping_add(value);
