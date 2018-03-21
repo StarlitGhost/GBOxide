@@ -1,4 +1,5 @@
 use cartridge::Cartridge;
+use gameboy::interrupt::InterruptHandler;
 use gameboy::timer::Timer;
 
 //TODO: all basic stubs in here, should be rom/ram banks, vram, etc
@@ -11,8 +12,7 @@ pub struct MMU {
 
     serial: u8,
 
-    interrupt_flag: u8,
-    interrupt_enable: u8,
+    interrupt: InterruptHandler,
 
     cycles: u32,
     timer: Timer,
@@ -28,8 +28,7 @@ impl MMU {
 
             serial: 0x00,
 
-            interrupt_flag: 0x00,
-            interrupt_enable: 0x00,
+            interrupt: InterruptHandler::new(),
 
             cycles: 0,
             timer: Timer::new(),
@@ -47,10 +46,10 @@ impl MMU {
             0xFF05 => self.timer.get_counter(),
             0xFF06 => self.timer.get_modulo(),
             0xFF07 => self.timer.get_control(),
-            0xFF0F => self.interrupt_flag,
+            0xFF0F => self.interrupt.get_flag(),
             0xFF40 ... 0xFF4B => 0xFF, // GPU control registers
             0xFF80 ... 0xFFFE => self.high_ram[(addr & 0x7F) as usize],
-            0xFFFF => self.interrupt_enable,
+            0xFFFF => self.interrupt.get_enable(),
             _ => panic!("read from address {:#06x} is in an unimplemented memory region", addr),
         }
     }
@@ -74,7 +73,7 @@ impl MMU {
             0xFF06 => self.timer.set_modulo(value),
             0xFF07 => self.timer.set_control(value),
             0xFF08 ... 0xFF0E => (), // unusable
-            0xFF0F => self.interrupt_flag = value,
+            0xFF0F => self.interrupt.set_flag(value),
             0xFF10 ... 0xFF26 => (), // 'NR' sound registers
             0xFF27 ... 0xFF29 => (), // unusable
             0xFF30 ... 0xFF3F => (), // wave pattern RAM
@@ -83,7 +82,7 @@ impl MMU {
             0xFF50 => (), // boot rom disable
             0xFF51 ... 0xFF7F => (), // unusable
             0xFF80 ... 0xFFFE => self.high_ram[(addr & 0x007F) as usize] = value,
-            0xFFFF => self.interrupt_enable = value,
+            0xFFFF => self.interrupt.set_enable(value),
             _ => panic!("write to address {:#06x} is in an unimplemented memory region", addr),
         }
     }

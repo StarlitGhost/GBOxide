@@ -144,7 +144,7 @@ pub enum InterruptStatus {
 
 pub struct CPU {
     r: Registers,
-    interrupts: InterruptStatus,
+    interrupt_state: InterruptStatus,
     halted: bool,
 }
 
@@ -152,7 +152,7 @@ impl CPU {
     pub fn new() -> CPU {
         CPU {
             r: Registers::new(),
-            interrupts: InterruptStatus::Enabled,
+            interrupt_state: InterruptStatus::Enabled,
             halted: false,
         }
     }
@@ -164,10 +164,10 @@ impl CPU {
             }
             let op = mmu.read_u8(self.r.pc);
 //            print!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
-            let interrupt = match self.interrupts {
+            let interrupt = match self.interrupt_state {
                 InterruptStatus::Enabled => false, // TODO: actual interrupts
                 InterruptStatus::Enabling => {
-                    self.interrupts = InterruptStatus::Enabled;
+                    self.interrupt_state = InterruptStatus::Enabled;
                     false
                 },
                 InterruptStatus::Disabled => false
@@ -983,18 +983,18 @@ impl CPU {
     }
 
     fn reti(&mut self, mmu: &mut MMU) {
-        self.interrupts = InterruptStatus::Enabling;
+        self.interrupt_state = InterruptStatus::Enabling;
         self.return_op(mmu);
     }
 
     fn di(&mut self, _: &MMU) {
-        self.interrupts = InterruptStatus::Disabled;
+        self.interrupt_state = InterruptStatus::Disabled;
     }
 
     fn ei(&mut self, _: &MMU) {
-        self.interrupts = match self.interrupts {
+        self.interrupt_state = match self.interrupt_state {
             InterruptStatus::Disabled => InterruptStatus::Enabling,
-            _ => self.interrupts,
+            _ => self.interrupt_state,
         }
     }
 
