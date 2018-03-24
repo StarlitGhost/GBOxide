@@ -12,7 +12,7 @@ pub struct MMU {
 
     serial: u8,
 
-    interrupt: InterruptHandler,
+    pub interrupt: InterruptHandler,
 
     cycles: u32,
     timer: Timer,
@@ -103,6 +103,6 @@ impl MMU {
 
     fn step(&mut self) {
         self.add_machine_cycles(1);
-        self.timer.step();
+        self.timer.step(&mut self.interrupt);
     }
 }

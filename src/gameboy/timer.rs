@@ -1,3 +1,5 @@
+use gameboy::interrupt::{InterruptHandler, Interrupt};
+
 #[derive(Clone, Copy, Debug)]
 pub enum Clock {
     Clk4096Hz = 0,
@@ -83,7 +85,7 @@ impl Timer {
         self.clock = Clock::from_u8(value & 0x3);
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self, ih: &mut InterruptHandler) {
         self.divider = self.divider.wrapping_add(4);
 
         if self.enabled {
@@ -94,7 +96,7 @@ impl Timer {
                 let (tima, overflow) = self.tima.overflowing_add(1);
                 if overflow {
                     self.tima = self.modulo;
-                    // TODO: interrupt
+                    ih.set_interrupt(Interrupt::Timer);
                 } else {
                     self.tima = tima;
                 }

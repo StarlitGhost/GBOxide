@@ -159,20 +159,28 @@ impl CPU {
 
     pub fn execute(&mut self, mmu: &mut MMU) -> Result<(), Box<Error>> {
         loop {
-            if self.halted {
-                continue;
-            }
-            let op = mmu.read_u8(self.r.pc);
-//            print!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
             let interrupt = match self.interrupt_state {
-                InterruptStatus::Enabled => false, // TODO: actual interrupts
+                InterruptStatus::Enabled => {
+                    mmu.interrupt.get_enabled_flags() != 0
+                },
                 InterruptStatus::Enabling => {
                     self.interrupt_state = InterruptStatus::Enabled;
                     false
                 },
                 InterruptStatus::Disabled => false
             };
-            // TODO: interrupt handling
+            if interrupt {
+                // TODO: interrupt handling
+                self.handle_interrupt(mmu);
+                continue;
+            }
+            if self.halted {
+                continue;
+            }
+
+            let op = mmu.read_u8(self.r.pc);
+//            print!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
+
             self.r.pc = self.r.pc.wrapping_add(1);
             if op == 0xCB {
                 let op = mmu.read_u8(self.r.pc);
@@ -746,6 +754,27 @@ impl CPU {
             }
 //            println!(" {}", self.r);
         }
+    }
+
+    fn handle_interrupt(&mut self, mmu: &mut MMU) {
+        let interrupt_enabled_flagged = mmu.interrupt.get_enabled_flags();
+        let interrupt = interrupt_enabled_flagged.trailing_zeros();
+
+        let address = match interrupt {
+            0 => 0x0040,
+            1 => 0x0048,
+            2 => 0x0050,
+            3 => 0x0058,
+            4 => 0x0060,
+            _ => panic!("unrecognized interrupt flag at position {}", interrupt),
+        };
+
+        let flag = mmu.interrupt.get_flag();
+        mmu.interrupt.set_flag(flag & !(1 << interrupt));
+        self.interrupt_state = InterruptStatus::Disabled;
+
+        self.call_address(mmu, address);
+        self.halted = false;
     }
 
     fn next_u8(&mut self, mmu: &mut MMU) -> u8 {

@@ -33,6 +33,10 @@ impl InterruptHandler {
         self.enable = value;
     }
 
+    pub fn get_enabled_flags(&self) -> u8 {
+        self.flag & self.enable
+    }
+
     pub fn set_interrupt(&mut self, interrupt: Interrupt) {
         self.flag |= interrupt as u8;
     }
