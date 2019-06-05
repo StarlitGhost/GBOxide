@@ -15,6 +15,7 @@ pub struct MMU {
     pub interrupt: InterruptHandler,
 
     cycles: u32,
+    prev_cycles: u32,
     timer: Timer,
 }
 
@@ -31,8 +32,19 @@ impl MMU {
             interrupt: InterruptHandler::new(),
 
             cycles: 0,
+            prev_cycles: 0,
             timer: Timer::new(),
         }
+    }
+
+    pub fn get_cycles(&self) -> u32 {
+        self.cycles
+    }
+
+    pub fn get_cycle_diff(&mut self) -> u32 {
+        let cycle_diff = self.cycles - self.prev_cycles;
+        self.prev_cycles = self.cycles;
+        cycle_diff
     }
 
     fn read_addr_map(&self, addr: u16) -> u8 {
@@ -104,5 +116,10 @@ impl MMU {
     fn step(&mut self) {
         self.add_machine_cycles(1);
         self.timer.step(&mut self.interrupt);
+    }
+
+    // for mysterious extra instruction delays. adds 1 machine cycle to the cycle counter
+    pub fn spin(&mut self) {
+        self.step();
     }
 }

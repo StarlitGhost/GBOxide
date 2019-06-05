@@ -46,14 +46,14 @@ pub struct Registers {
 impl Registers {
     pub fn new() -> Registers {
         Registers {
-            a: 0,
-            f: Flags::empty(),
-            b: 0,
-            c: 0,
-            d: 0,
-            e: 0,
-            h: 0,
-            l: 0,
+            a: 0x01,
+            f: Flags::ZERO | Flags::HALFCARRY | Flags::CARRY,
+            b: 0x00,
+            c: 0x13,
+            d: 0x00,
+            e: 0xd8,
+            h: 0x01,
+            l: 0x4d,
             sp: 0xFFFE,
             pc: 0x0100,
         }

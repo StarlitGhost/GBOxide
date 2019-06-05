@@ -1,5 +1,7 @@
 use std::error::Error;
 
+use std::io::{stdin, Read};
+
 use gameboy::registers::{
     Registers, Register8Bit, Register16Bit, Flags,
 };
@@ -179,11 +181,12 @@ impl CPU {
             }
 
             let op = mmu.read_u8(self.r.pc);
-//            print!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
+            eprint!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
 
             self.r.pc = self.r.pc.wrapping_add(1);
             if op == 0xCB {
                 let op = mmu.read_u8(self.r.pc);
+                eprint!("{:02x}", op);
                 self.r.pc = self.r.pc.wrapping_add(1);
 
                 match op {
@@ -453,8 +456,7 @@ impl CPU {
                     0xBB => self.res(mmu, 7, E),
                     0xBC => self.res(mmu, 7, H),
                     0xBD => self.res(mmu, 7, L),
-                    0xBE => self.res(mmu, 7, Address::HL),
-                    _ => return Err(format!("unrecognized CB opcode {:#04x}", op).into())
+                    0xBE => self.res(mmu, 7, Address::HL)
                 };
             } else {
                 match op {
@@ -673,7 +675,7 @@ impl CPU {
                     0x1F => self.rr(mmu, A, false),
                     // JP
                     0xC3 => self.jp(mmu, NextU16),
-                    0xE9 => self.jp(mmu, HL),
+                    0xE9 => self.jp_hl(mmu, HL),
                     // JP cc,nn
                     0xC2 => self.jp_conditional(mmu, Condition::NOTZERO),
                     0xCA => self.jp_conditional(mmu, Condition::ZERO),
@@ -752,8 +754,18 @@ impl CPU {
                     _ => return Err(format!("unrecognized opcode {:#04x}", op).into())
                 };
             }
-//            println!(" {}", self.r);
+            eprint!(", cycles: {} (diff: {})", mmu.get_cycles(), mmu.get_cycle_diff());
+            eprint!(" {}", self.r);
+            eprintln!("");
+            //if self.r.pc == 0xc7f4
+            //{
+            self.pause();
+            //}
         }
+    }
+
+    fn pause(&mut self) {
+        stdin().read(&mut [0]).unwrap();
     }
 
     fn handle_interrupt(&mut self, mmu: &mut MMU) {
@@ -844,6 +856,7 @@ impl CPU {
     }
 
     fn call_address(&mut self, mmu: &mut MMU, address: u16) {
+        mmu.spin();
         let pc = self.r.pc;
         self.push_u16(mmu, pc);
         self.r.pc = address;
@@ -853,12 +866,14 @@ impl CPU {
         self.r.pc = address;
     }
 
-    fn jump_relative(&mut self, _: &MMU, offset: i8) {
+    fn jump_relative(&mut self, mmu: &mut MMU, offset: i8) {
+        mmu.spin();
         self.r.pc = self.r.pc.wrapping_add(offset as u16);
     }
 
     fn return_op(&mut self, mmu: &mut MMU) {
-        self.r.pc = self.pop_u16(mmu);
+        let address = self.pop_u16(mmu);
+        self.jump(mmu, address);
     }
 
     // 8-bit operations
@@ -961,6 +976,12 @@ impl CPU {
 
     fn jp<R: ReadU16>(&mut self, mmu: &mut MMU, r: R) {
         let address = r.read_u16(self, mmu);
+        mmu.spin();
+        self.jump(mmu, address);
+    }
+
+    fn jp_hl<R: ReadU16>(&mut self, mmu: &mut MMU, r: R) {
+        let address = r.read_u16(self, mmu);
         self.jump(mmu, address);
     }
 
@@ -976,6 +997,7 @@ impl CPU {
 
     fn rst(&mut self, mmu: &mut MMU, address: u8) {
         let pc = self.r.pc;
+        mmu.spin();
         self.push_u16(mmu, pc);
         self.r.pc = address as u16;
     }
@@ -987,6 +1009,7 @@ impl CPU {
     fn jp_conditional(&mut self, mmu: &mut MMU, condition: Condition) {
         let address = self.next_u16(mmu);
         if condition.check(self.r.f) {
+            mmu.spin();
             self.jump(mmu, address);
         }
     }
@@ -1006,6 +1029,7 @@ impl CPU {
     }
 
     fn ret_conditional(&mut self, mmu: &mut MMU, condition: Condition) {
+        mmu.spin();
         if condition.check(self.r.f) {
             self.return_op(mmu);
         }
@@ -1184,6 +1208,7 @@ impl CPU {
     fn ld16_sp_n(&mut self, mmu: &mut MMU) {
         let sp = self.r.get_u16(Register16Bit::SP);
         let value = self.next_u8(mmu) as i8 as i16 as u16;
+        mmu.spin();
         let result = sp.wrapping_add(value);
         self.r.f = Flags::HALFCARRY.check((sp & 0xF) + (value & 0xF) > 0xF) |
                     Flags::CARRY.check((sp & 0xFF) + (value & 0xFF) > 0xFF);
@@ -1192,6 +1217,7 @@ impl CPU {
 
     fn push16<R: ReadU16>(&mut self, mmu: &mut MMU, r: R) {
         let value = r.read_u16(self, mmu);
+        mmu.spin();
         self.push_u16(mmu, value);
     }
 
@@ -1203,18 +1229,21 @@ impl CPU {
     fn inc16<RW: ReadU16+WriteU16>(&mut self, mmu: &mut MMU, rw: RW) {
         let value = rw.read_u16(self, mmu);
         let new_value = value.wrapping_add(1);
+        mmu.spin();
         rw.write_u16(self, mmu, new_value);
     }
 
     fn dec16<RW: ReadU16+WriteU16>(&mut self, mmu: &mut MMU, rw: RW) {
         let value = rw.read_u16(self, mmu);
         let new_value = value.wrapping_sub(1);
+        mmu.spin();
         rw.write_u16(self, mmu, new_value);
     }
 
     fn add16_hl<R: ReadU16>(&mut self, mmu: &mut MMU, r: R) {
         let hl = self.r.get_u16(Register16Bit::HL);
         let value = r.read_u16(self, mmu);
+        mmu.spin();
         let new_value = hl.wrapping_add(value);
         let mask = (1u16 << 11).wrapping_sub(1);
         let half_carry = (hl & mask) + (value & mask) > mask;
@@ -1227,6 +1256,7 @@ impl CPU {
     fn add16_sp(&mut self, mmu: &mut MMU) {
         let sp = self.r.get_u16(Register16Bit::SP);
         let value = self.next_u8(mmu) as i8 as i16 as u16;
+        mmu.spin();
         let result = sp.wrapping_add(value);
         self.r.f = Flags::HALFCARRY.check((sp & 0xF) + (value & 0xF) > 0xF) |
                     Flags::CARRY.check((sp & 0xFF) + (value & 0xFF) > 0xFF);
