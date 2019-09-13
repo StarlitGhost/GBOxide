@@ -14,7 +14,7 @@ pub struct Cartridge {
 }
 
 impl Cartridge {
-    pub fn new(filename: &str) -> Result<Cartridge, Box<Error>> {
+    pub fn new(filename: &str) -> Result<Cartridge, Box<dyn Error>> {
         let mut f = File::open(filename)?;
         let mut rom_data = Vec::new();
         f.read_to_end(&mut rom_data)?;
@@ -89,7 +89,7 @@ pub struct Header {
 }
 
 impl Header {
-    pub fn new(header_bytes: [u8; 0x50]) -> Result<Header, Box<Error>> {
+    pub fn new(header_bytes: [u8; 0x50]) -> Result<Header, Box<dyn Error>> {
         let mut raw_entry_point = [0u8; 0x4];
         raw_entry_point.copy_from_slice(&header_bytes[0x0..0x4]);
         let mut raw_nintendo_logo = [0u8; 0x30];
@@ -224,7 +224,7 @@ impl Header {
         checksum.0
     }
 
-    fn lookup_new_licensee_code(licensee_code: &str) -> Result<&str, Box<Error>> {
+    fn lookup_new_licensee_code(licensee_code: &str) -> Result<&str, Box<dyn Error>> {
         match licensee_code {
             "00" => Ok("none"),
             "01" => Ok("Nintendo R&D1"),
@@ -292,7 +292,7 @@ impl Header {
         }
     }
 
-    fn lookup_old_licensee_code<'a>(licensee_code: &'a u8) -> Result<&'a str, Box<Error>> {
+    fn lookup_old_licensee_code<'a>(licensee_code: &'a u8) -> Result<&'a str, Box<dyn Error>> {
         match licensee_code {
             &0x00 => Ok("none"),
             &0x01 => Ok("Nintendo"),

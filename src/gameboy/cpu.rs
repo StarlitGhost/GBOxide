@@ -159,7 +159,7 @@ impl CPU {
         }
     }
 
-    pub fn execute(&mut self, mmu: &mut MMU) -> Result<(), Box<Error>> {
+    pub fn execute(&mut self, mmu: &mut MMU) -> Result<(), Box<dyn Error>> {
         loop {
             let interrupt = match self.interrupt_state {
                 InterruptStatus::Enabled => {

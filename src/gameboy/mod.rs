@@ -9,7 +9,7 @@ use std::error::Error;
 use ::cartridge::Cartridge;
 use ::gameboy;
 
-pub fn run(cartridge: Cartridge) -> Result<(), Box<Error>> {
+pub fn run(cartridge: Cartridge) -> Result<(), Box<dyn Error>> {
 //    println!("{:#?}", cartridge.header);
 //    println!("read_rom_size: {}", cartridge.rom_data.len());
 
