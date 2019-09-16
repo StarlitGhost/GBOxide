@@ -172,11 +172,15 @@ impl CPU {
                 InterruptStatus::Disabled => false
             };
             if interrupt {
-                // TODO: interrupt handling
                 self.handle_interrupt(mmu);
                 continue;
             }
             if self.halted {
+                if mmu.interrupt.get_enabled_flags() != 0 {
+                    self.halted = false;
+                } else {
+                    mmu.spin();
+                }
                 continue;
             }
 
@@ -757,10 +761,11 @@ impl CPU {
             eprint!(", cycles: {} (diff: {})", mmu.get_cycles(), mmu.get_cycle_diff());
             eprint!(" {}", self.r);
             eprintln!("");
-            //if self.r.pc == 0xc7f4
-            //{
-            self.pause();
-            //}
+
+            if self.r.pc == 0xffff
+            {
+                self.pause();
+            }
         }
     }
 

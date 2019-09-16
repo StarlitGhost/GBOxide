@@ -38,6 +38,6 @@ impl InterruptHandler {
     }
 
     pub fn set_interrupt(&mut self, interrupt: Interrupt) {
-        self.flag |= interrupt as u8;
+        self.flag |= 1 << interrupt as u8;
     }
 }
