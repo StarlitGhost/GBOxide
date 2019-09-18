@@ -3,6 +3,7 @@ pub mod registers;
 pub mod mmu;
 pub mod interrupt;
 pub mod timer;
+pub mod lcd;
 
 use std::error::Error;
 

@@ -1,14 +1,17 @@
 use cartridge::Cartridge;
 use gameboy::interrupt::InterruptHandler;
 use gameboy::timer::Timer;
+use gameboy::lcd::{
+    LCD, Control as LCDControl, Status as LCDStatus
+};
 
 //TODO: all basic stubs in here, should be rom/ram banks, vram, etc
 
 pub struct MMU {
-    cart_rom: Box<[u8]>,
-    cart_ram: [u8; 0x2000],
-    system_ram: [u8; 0x2000],
-    high_ram: [u8; 0x7F],
+    cart_rom: Box<[u8]>,      //0x0000-0x7FFF - 0x4000+ Switchable
+    cart_ram: [u8; 0x2000],   //0xA000-0xBFFF
+    system_ram: [u8; 0x2000], //0xC000-0xDFFF
+    high_ram: [u8; 0x7F],     //0xFF80-0xFFFE
 
     serial: u8,
 
@@ -17,6 +20,8 @@ pub struct MMU {
     cycles: u32,
     prev_cycles: u32,
     timer: Timer,
+
+    lcd: LCD,
 }
 
 impl MMU {
@@ -34,6 +39,8 @@ impl MMU {
             cycles: 0,
             prev_cycles: 0,
             timer: Timer::new(),
+
+            lcd: LCD::new(),
         }
     }
 
@@ -59,6 +66,8 @@ impl MMU {
             0xFF06 => self.timer.get_modulo(),
             0xFF07 => self.timer.get_control(),
             0xFF0F => self.interrupt.get_flag(),
+            0xFF40 => self.lcd.control.bits() as u8,
+            0xFF41 => self.lcd.status.bits() as u8,
             0xFF40 ..= 0xFF4B => 0xFF, // GPU control registers
             0xFF80 ..= 0xFFFE => self.high_ram[(addr & 0x7F) as usize],
             0xFFFF => self.interrupt.get_enable(),
@@ -89,6 +98,8 @@ impl MMU {
             0xFF10 ..= 0xFF26 => (), // 'NR' sound registers
             0xFF27 ..= 0xFF29 => (), // unusable
             0xFF30 ..= 0xFF3F => (), // wave pattern RAM
+            0xFF40 => self.lcd.control = LCDControl::from_bits_truncate(value as u8),
+            0xFF41 => self.lcd.status = LCDStatus::from_bits_truncate(value as u8),
             0xFF40 ..= 0xFF4B => (), // GPU control registers
             0xFF4C ..= 0xFF4F => (), // unusable
             0xFF50 => (), // boot rom disable

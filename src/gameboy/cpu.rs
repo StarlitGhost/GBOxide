@@ -185,12 +185,12 @@ impl CPU {
             }
 
             let op = mmu.read_u8(self.r.pc);
-            eprint!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
+            //eprint!("-- r.pc {:#06x}, op {:#04x}", self.r.pc, op);
 
             self.r.pc = self.r.pc.wrapping_add(1);
             if op == 0xCB {
                 let op = mmu.read_u8(self.r.pc);
-                eprint!("{:02x}", op);
+                //eprint!("{:02x}", op);
                 self.r.pc = self.r.pc.wrapping_add(1);
 
                 match op {
@@ -758,9 +758,9 @@ impl CPU {
                     _ => return Err(format!("unrecognized opcode {:#04x}", op).into())
                 };
             }
-            eprint!(", cycles: {} (diff: {})", mmu.get_cycles(), mmu.get_cycle_diff());
-            eprint!(" {}", self.r);
-            eprintln!("");
+            //eprint!(", cycles: {} (diff: {})", mmu.get_cycles(), mmu.get_cycle_diff());
+            //eprint!(" {}", self.r);
+            //eprintln!("");
 
             if self.r.pc == 0xffff
             {
