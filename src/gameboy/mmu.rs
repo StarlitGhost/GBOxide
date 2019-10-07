@@ -1,9 +1,7 @@
 use cartridge::Cartridge;
 use gameboy::interrupt::InterruptHandler;
 use gameboy::timer::Timer;
-use gameboy::lcd::{
-    LCD, Control as LCDControl, Status as LCDStatus
-};
+use gameboy::lcd::LCD;
 
 //TODO: all basic stubs in here, should be rom/ram banks, vram, etc
 
@@ -58,55 +56,63 @@ impl MMU {
         match addr {
             0x0000 ..= 0x3FFF => self.cart_rom[addr as usize],
             0x4000 ..= 0x7FFF => self.cart_rom[addr as usize], //panic!("switchable ROM banks not yet implemented"),
+            0x8000 ..= 0x97FF => self.lcd.vram_tile_data[(addr - 0x8000) as usize],
+            0x9800 ..= 0x9BFF => self.lcd.vram_bg_maps[(addr - 0x9800) as usize], // Map 1
+            0x9C00 ..= 0x9FFF => self.lcd.vram_bg_maps[(addr - 0x9800) as usize], // Map 2
             0xA000 ..= 0xBFFF => self.cart_ram[(addr - 0xA000) as usize],
             0xC000 ..= 0xDFFF => self.system_ram[(addr - 0xC000) as usize],
             0xE000 ..= 0xFDFF => self.system_ram[(addr - 0xE000) as usize], // echo RAM
-            0xFF04 => self.timer.get_divider(),
-            0xFF05 => self.timer.get_counter(),
-            0xFF06 => self.timer.get_modulo(),
-            0xFF07 => self.timer.get_control(),
+            0xFE00 ..= 0xFE9F => self.lcd.read_oam(addr - 0xFE00), // object attribute memory
+            0xFEA0 ..= 0xFEFF => 0xFF, // unusable OAM region
+            0xFF00 => 0xFF, // joypad
+            0xFF01 => 0xFF, // serial byte
+            0xFF02 => 0xFF, // serial control
+            0xFF03 => 0xFF, // unusable
+            0xFF04 ..= 0xFF07 => self.timer.read_register(addr),
+            0xFF08 ..= 0xFF0E => 0xFF, // unusable
             0xFF0F => self.interrupt.get_flag(),
-            0xFF40 => self.lcd.control.bits() as u8,
-            0xFF41 => self.lcd.status.bits() as u8,
-            0xFF40 ..= 0xFF4B => 0xFF, // GPU control registers
+            0xFF10 ..= 0xFF26 => 0xFF, // 'NR' sound registers
+            0xFF27 ..= 0xFF2F => 0xFF, // unusable
+            0xFF30 ..= 0xFF3F => 0xFF, // wave pattern RAM
+            0xFF40 ..= 0xFF4B => self.lcd.read_register(addr), // LCD control registers
+            0xFF4C ..= 0xFF4F => 0xFF, // unusable
+            0xFF50 => 0xFF, // boot rom disable (unreadable - I think that just means 0xFF)
+            0xFF51 ..= 0xFF7F => 0xFF, // unusable
             0xFF80 ..= 0xFFFE => self.high_ram[(addr & 0x7F) as usize],
             0xFFFF => self.interrupt.get_enable(),
-            _ => panic!("read from address {:#06x} is in an unimplemented memory region", addr),
         }
     }
 
     fn write_addr_map(&mut self, addr: u16, value: u8) {
         match addr {
             0x0000 ..= 0x1FFF => (), // a write of 0x0A to this region enables system RAM. 0x00 disables
-            0x4000 ..= 0x7FFF => panic!("switchable ROM banks not yet implemented"),
-            0x8000 ..= 0x97FF => (), // GPU character/tile RAM
-            0x9800 ..= 0x9BFF => (), // GPU BG Map Data 1
-            0x9C00 ..= 0x9FFF => (), // GPU BG Map Data 2
+            0x2000 ..= 0x3FFF => (), // set rom bank (dependant on cart type)
+            0x4000 ..= 0x5FFF => (), // set ram bank (dependant on cart type)
+            0x6000 ..= 0x7FFF => (), // enable/disable ram and rom bank switching, dependent on cart type
+            0x8000 ..= 0x97FF => self.lcd.vram_tile_data[(addr - 0x8000) as usize] = value,
+            0x9800 ..= 0x9BFF => self.lcd.vram_bg_maps[(addr - 0x9800) as usize] = value, // Map 1
+            0x9C00 ..= 0x9FFF => self.lcd.vram_bg_maps[(addr - 0x9800) as usize] = value, // Map 2
             0xA000 ..= 0xBFFF => self.cart_ram[(addr - 0xA000) as usize] = value,
             0xC000 ..= 0xDFFF => self.system_ram[(addr - 0xC000) as usize] = value,
             0xE000 ..= 0xFDFF => self.system_ram[(addr - 0xE000) as usize] = value, // echo RAM
-            0xFE00 ..= 0xFE9F => (), // object attribute memory, writes to this region draw sprites
-            0xFEA0 ..= 0xFEFF => (), // unusable
+            0xFE00 ..= 0xFE9F => self.lcd.write_oam(addr - 0xFE00, value), // object attribute memory, writes to this region draw sprites
+            0xFEA0 ..= 0xFEFF => (), // unusable OAM region
+            0xFF00 => (), // joypad
             0xFF01 => self.serial = value, // serial data
             0xFF02 => { print!("{}", self.serial as char); }, // serial IO control
-            0xFF04 => self.timer.reset_divider(),
-            0xFF05 => self.timer.set_counter(value),
-            0xFF06 => self.timer.set_modulo(value),
-            0xFF07 => self.timer.set_control(value),
+            0xFF03 => (), // unusable
+            0xFF04 ..= 0xFF07 => self.timer.write_register(addr, value),
             0xFF08 ..= 0xFF0E => (), // unusable
             0xFF0F => self.interrupt.set_flag(value),
             0xFF10 ..= 0xFF26 => (), // 'NR' sound registers
-            0xFF27 ..= 0xFF29 => (), // unusable
+            0xFF27 ..= 0xFF2F => (), // unusable
             0xFF30 ..= 0xFF3F => (), // wave pattern RAM
-            0xFF40 => self.lcd.control = LCDControl::from_bits_truncate(value as u8),
-            0xFF41 => self.lcd.status = LCDStatus::from_bits_truncate(value as u8),
-            0xFF40 ..= 0xFF4B => (), // GPU control registers
+            0xFF40 ..= 0xFF4B => self.lcd.write_register(addr, value), // GPU control registers
             0xFF4C ..= 0xFF4F => (), // unusable
             0xFF50 => (), // boot rom disable
             0xFF51 ..= 0xFF7F => (), // unusable
             0xFF80 ..= 0xFFFE => self.high_ram[(addr & 0x007F) as usize] = value,
             0xFFFF => self.interrupt.set_enable(value),
-            _ => panic!("write to address {:#06x} is in an unimplemented memory region", addr),
         }
     }
 

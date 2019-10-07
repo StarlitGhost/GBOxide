@@ -52,35 +52,55 @@ impl Timer {
         }
     }
 
-    pub fn get_divider(&self) -> u8 {
+    pub fn read_register(&self, addr: u16) -> u8 {
+        match addr {
+            0xFF04 => self.get_divider(),
+            0xFF05 => self.get_counter(),
+            0xFF06 => self.get_modulo(),
+            0xFF07 => self.get_control(),
+            _ => unreachable!(), // mmu will only send us addresses in 0xFF04 - 0xFF07 range
+        }
+    }
+
+    pub fn write_register(&mut self, addr: u16, value: u8) {
+        match addr {
+            0xFF04 => self.reset_divider(),
+            0xFF05 => self.set_counter(value),
+            0xFF06 => self.set_modulo(value),
+            0xFF07 => self.set_control(value),
+            _ => unreachable!(), // mmu will only send us addresses in 0xFF04 - 0xFF07 range
+        }
+    }
+
+    fn get_divider(&self) -> u8 {
         self.divider
     }
 
-    pub fn reset_divider(&mut self) {
+    fn reset_divider(&mut self) {
         self.divider = 0;
     }
 
-    pub fn get_counter(&self) -> u8 {
+    fn get_counter(&self) -> u8 {
         self.tima
     }
 
-    pub fn set_counter(&mut self, value: u8) {
+    fn set_counter(&mut self, value: u8) {
         self.tima = value;
     }
 
-    pub fn get_modulo(&self) -> u8 {
+    fn get_modulo(&self) -> u8 {
         self.modulo
     }
 
-    pub fn set_modulo(&mut self, value: u8) {
+    fn set_modulo(&mut self, value: u8) {
         self.modulo = value;
     }
 
-    pub fn get_control(&self) -> u8 {
+    fn get_control(&self) -> u8 {
         self.clock as u8 | if self.enabled { 1 << 2 } else { 0 }
     }
 
-    pub fn set_control(&mut self, value: u8) {
+    fn set_control(&mut self, value: u8) {
         self.enabled = (value >> 2) & 0x1 == 1;
         self.clock = Clock::from_u8(value & 0x3);
     }
