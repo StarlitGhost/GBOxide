@@ -57,7 +57,7 @@ impl MMU {
             0x8000 ..= 0x97FF => self.lcd.vram_tile_data[(addr - 0x8000) as usize],
             0x9800 ..= 0x9BFF => self.lcd.vram_bg_maps[(addr - 0x9800) as usize], // Map 1
             0x9C00 ..= 0x9FFF => self.lcd.vram_bg_maps[(addr - 0x9800) as usize], // Map 2
-            0xA000 ..= 0xBFFF => self.cart.read(addr - 0xA000), // switchable cart ram banks
+            0xA000 ..= 0xBFFF => self.cart.read(addr), // switchable cart ram banks
             0xC000 ..= 0xDFFF => self.system_ram[(addr - 0xC000) as usize],
             0xE000 ..= 0xFDFF => self.system_ram[(addr - 0xE000) as usize], // echo RAM
             0xFE00 ..= 0xFE9F => self.lcd.read_oam(addr - 0xFE00), // object attribute memory

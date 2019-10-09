@@ -55,6 +55,15 @@ impl MBC1 {
         }
     }
 
+    fn write_selected_ram_bank(&mut self, addr: u16, value: u8) {
+        if !self.ram_enabled { return }
+
+        let bank_addr = 0x2000 * (self.ram_bank_selection as u16) + (addr - 0xA000);
+        if (bank_addr as usize) < self.ram.len() {
+            self.ram[bank_addr as usize] = value
+        }
+    }
+
     fn enable_ram(&mut self, value: u8) {
         self.ram_enabled = match value & 0x0F {
             0x0A => true,
@@ -97,6 +106,7 @@ impl MBC for MBC1 {
                 self.select_rom_bank_upper_bits(value)
             },
             0x6000 ..= 0x7FFF => self.ram_select_mode = match value & 0x1 { 0x01 => true, _ => false },
+            0xA000 ..= 0xBFFF => self.write_selected_ram_bank(addr, value),
             _ => unreachable!(), // mmu will only pass us addresses in this range
         };
     }
