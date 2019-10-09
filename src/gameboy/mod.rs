@@ -11,8 +11,8 @@ use ::cartridge::Cartridge;
 use ::gameboy;
 
 pub fn run(cartridge: Cartridge) -> Result<(), Box<dyn Error>> {
-//    println!("{:#?}", cartridge.header);
-//    println!("read_rom_size: {}", cartridge.rom_data.len());
+    println!("{:#?}", cartridge.header);
+    println!("read_rom_size: {}", cartridge.rom_len());
 
     let mut cpu = gameboy::cpu::CPU::new();
     let mut mmu = gameboy::mmu::MMU::new(cartridge);

@@ -6,8 +6,7 @@ use gameboy::lcd::LCD;
 //TODO: all basic stubs in here, should be rom/ram banks, vram, etc
 
 pub struct MMU {
-    cart_rom: Box<[u8]>,      //0x0000-0x7FFF - 0x4000+ Switchable
-    cart_ram: [u8; 0x2000],   //0xA000-0xBFFF
+    cart: Cartridge,
     system_ram: [u8; 0x2000], //0xC000-0xDFFF
     high_ram: [u8; 0x7F],     //0xFF80-0xFFFE
 
@@ -25,8 +24,7 @@ pub struct MMU {
 impl MMU {
     pub fn new(cartridge: Cartridge) -> MMU {
         MMU {
-            cart_rom: cartridge.rom_data.into_boxed_slice(),
-            cart_ram: [0x0; 0x2000],
+            cart: cartridge,
             system_ram: [0x0; 0x2000],
             high_ram: [0x0; 0x7F],
 
@@ -54,12 +52,12 @@ impl MMU {
 
     fn read_addr_map(&self, addr: u16) -> u8 {
         match addr {
-            0x0000 ..= 0x3FFF => self.cart_rom[addr as usize],
-            0x4000 ..= 0x7FFF => self.cart_rom[addr as usize], //panic!("switchable ROM banks not yet implemented"),
+            0x0000 ..= 0x3FFF => self.cart.read(addr), // cart rom bank 0
+            0x4000 ..= 0x7FFF => self.cart.read(addr), // switchable cart rom banks 1+
             0x8000 ..= 0x97FF => self.lcd.vram_tile_data[(addr - 0x8000) as usize],
             0x9800 ..= 0x9BFF => self.lcd.vram_bg_maps[(addr - 0x9800) as usize], // Map 1
             0x9C00 ..= 0x9FFF => self.lcd.vram_bg_maps[(addr - 0x9800) as usize], // Map 2
-            0xA000 ..= 0xBFFF => self.cart_ram[(addr - 0xA000) as usize],
+            0xA000 ..= 0xBFFF => self.cart.read(addr - 0xA000), // switchable cart ram banks
             0xC000 ..= 0xDFFF => self.system_ram[(addr - 0xC000) as usize],
             0xE000 ..= 0xFDFF => self.system_ram[(addr - 0xE000) as usize], // echo RAM
             0xFE00 ..= 0xFE9F => self.lcd.read_oam(addr - 0xFE00), // object attribute memory
@@ -85,14 +83,11 @@ impl MMU {
 
     fn write_addr_map(&mut self, addr: u16, value: u8) {
         match addr {
-            0x0000 ..= 0x1FFF => (), // a write of 0x0A to this region enables system RAM. 0x00 disables
-            0x2000 ..= 0x3FFF => (), // set rom bank (dependant on cart type)
-            0x4000 ..= 0x5FFF => (), // set ram bank (dependant on cart type)
-            0x6000 ..= 0x7FFF => (), // enable/disable ram and rom bank switching, dependent on cart type
+            0x0000 ..= 0x7FFF => self.cart.write(addr, value), // cart mbc control writes
             0x8000 ..= 0x97FF => self.lcd.vram_tile_data[(addr - 0x8000) as usize] = value,
             0x9800 ..= 0x9BFF => self.lcd.vram_bg_maps[(addr - 0x9800) as usize] = value, // Map 1
             0x9C00 ..= 0x9FFF => self.lcd.vram_bg_maps[(addr - 0x9800) as usize] = value, // Map 2
-            0xA000 ..= 0xBFFF => self.cart_ram[(addr - 0xA000) as usize] = value,
+            0xA000 ..= 0xBFFF => self.cart.write(addr, value), // switchable cart ram banks
             0xC000 ..= 0xDFFF => self.system_ram[(addr - 0xC000) as usize] = value,
             0xE000 ..= 0xFDFF => self.system_ram[(addr - 0xE000) as usize] = value, // echo RAM
             0xFE00 ..= 0xFE9F => self.lcd.write_oam(addr - 0xFE00, value), // object attribute memory, writes to this region draw sprites

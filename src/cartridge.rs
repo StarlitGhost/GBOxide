@@ -8,21 +8,136 @@ use std::num::Wrapping;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
+trait MBC {
+    fn read(&self, addr: u16) -> u8;
+    fn write(&mut self, addr: u16, value: u8);
+
+    fn rom_len(&self) -> usize;
+}
+
+struct MBC1 {
+    rom: Vec<u8>,
+    ram: Vec<u8>,
+    rom_bank_selection: u8,
+    ram_bank_selection: u8,
+    ram_enabled: bool,
+    ram_select_mode: bool,
+}
+
+impl MBC1 {
+    fn new(header: &Header, rom: Vec<u8>) -> MBC1 {
+        let ram = vec![0x0; header.ram_size as usize];
+        let rom_bank_selection = 0x01;
+        let ram_bank_selection = 0x00;
+        let ram_enabled = false;
+        let ram_select_mode = false;
+
+        MBC1 { rom, ram, rom_bank_selection, ram_bank_selection, ram_enabled, ram_select_mode }
+    }
+
+    fn read_selected_rom_bank(&self, addr: u16) -> u8 {
+        let bank_addr = 0x4000 * (self.rom_bank_selection as u16) + (addr - 0x4000);
+        if (bank_addr as usize) < self.rom.len() {
+            self.rom[bank_addr as usize]
+        } else {
+            0xFF // TODO: is this correct?
+        }
+    }
+
+    fn read_selected_ram_bank(&self, addr: u16) -> u8 {
+        if !self.ram_enabled { return 0xFF }
+
+        let bank_addr = 0x2000 * (self.ram_bank_selection as u16) + (addr - 0xA000);
+        if (bank_addr as usize) < self.ram.len() {
+            self.ram[bank_addr as usize]
+        } else {
+            0xFF // TODO: is this correct?
+        }
+    }
+
+    fn enable_ram(&mut self, value: u8) {
+        self.ram_enabled = match value & 0x0F {
+            0x0A => true,
+            _ => false
+        }
+    }
+
+    fn select_ram_bank(&mut self, value: u8) {
+        self.ram_bank_selection = value & 0b11;
+    }
+
+    fn select_rom_bank_lower_bits(&mut self, value: u8) {
+        self.rom_bank_selection &= 0b0110_0000;
+        self.rom_bank_selection |= match value & 0x1F { 0x00 => 0x01, _ => value & 0x1F};
+    }
+
+    fn select_rom_bank_upper_bits(&mut self, value: u8) {
+        self.rom_bank_selection &= 0b0001_1111;
+        self.rom_bank_selection |= (value & 0b11) << 5;
+    }
+}
+
+impl MBC for MBC1 {
+    fn read(&self, addr: u16) -> u8 {
+        match addr {
+            0x0000 ..= 0x3FFF => self.rom[addr as usize],
+            0x4000 ..= 0x7FFF => self.read_selected_rom_bank(addr),
+            0xA000 ..= 0xBFFF => self.read_selected_ram_bank(addr),
+            _ => unreachable!(), // the mmu should only send us addresses in these ranges
+        }
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        match addr {
+            0x0000 ..= 0x1FFF => self.enable_ram(value),
+            0x2000 ..= 0x3FFF => self.select_rom_bank_lower_bits(value),
+            0x4000 ..= 0x5FFF => if self.ram_select_mode {
+                self.select_ram_bank(value)
+            } else {
+                self.select_rom_bank_upper_bits(value)
+            },
+            0x6000 ..= 0x7FFF => self.ram_select_mode = match value & 0x1 { 0x01 => true, _ => false },
+            _ => unreachable!(), // mmu will only pass us addresses in this range
+        };
+    }
+
+    fn rom_len(&self) -> usize {
+        self.rom.len()
+    }
+}
+
 pub struct Cartridge {
-    pub rom_data: Vec<u8>,
     pub header: Header,
+    mbc: Box<dyn MBC>,
 }
 
 impl Cartridge {
     pub fn new(filename: &str) -> Result<Cartridge, Box<dyn Error>> {
         let mut f = File::open(filename)?;
-        let mut rom_data = Vec::new();
-        f.read_to_end(&mut rom_data)?;
+        let mut rom = Vec::new();
+        f.read_to_end(&mut rom)?;
         let mut header_bytes = [0; 0x50];
-        header_bytes.copy_from_slice(&rom_data[0x100..0x150]);
+        header_bytes.copy_from_slice(&rom[0x100..0x150]);
         let header = Header::new(header_bytes)?;
 
-        Ok(Cartridge { rom_data, header })
+        let mbc = match header.cartridge_type {
+            CartridgeType::MBC1 => Box::new(MBC1::new(&header, rom)),
+            _ => panic!("Cartridge type {:?} is not yet implemented", header.cartridge_type),
+        };
+
+        Ok(Cartridge { header, mbc })
+    }
+
+    pub fn read(&self, addr: u16) -> u8 {
+        self.mbc.read(addr)
+    }
+
+    pub fn write(&mut self, addr: u16, value: u8) {
+        self.mbc.write(addr, value);
+    }
+
+    pub fn rom_len(&self) -> usize {
+        self.mbc.rom_len()
     }
 }
 
