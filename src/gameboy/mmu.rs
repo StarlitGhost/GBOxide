@@ -44,10 +44,10 @@ impl MMU {
         self.cycles
     }
 
-    pub fn get_cycle_diff(&mut self) -> u32 {
+    pub fn get_cycle_diff(&mut self) -> u8 {
         let cycle_diff = self.cycles - self.prev_cycles;
         self.prev_cycles = self.cycles;
-        cycle_diff
+        cycle_diff as u8
     }
 
     fn read_addr_map(&self, addr: u16) -> u8 {
@@ -102,7 +102,9 @@ impl MMU {
             0xFF10 ..= 0xFF26 => (), // 'NR' sound registers
             0xFF27 ..= 0xFF2F => (), // unusable
             0xFF30 ..= 0xFF3F => (), // wave pattern RAM
-            0xFF40 ..= 0xFF4B => self.lcd.write_register(addr, value), // GPU control registers
+            0xFF40 ..= 0xFF45 => self.lcd.write_register(addr, value), // GPU control registers
+            0xFF46 => self.dma_transfer(value), // DMA transfer to OAM
+            0xFF47 ..= 0xFF4B => self.lcd.write_register(addr, value), // GPU control registers
             0xFF4C ..= 0xFF4F => (), // unusable
             0xFF50 => (), // boot rom disable
             0xFF51 ..= 0xFF7F => (), // unusable
@@ -121,6 +123,17 @@ impl MMU {
         self.write_addr_map(addr, value);
     }
 
+    pub fn dma_transfer(&mut self, value: u8) {
+        // copies data from rom/ram to oam sprite memory
+        // the value written is the address to read from, divided by 100
+        // takes 160 cycles, 40 single byte read/writes of 4 cycles each
+        let addr = (value * 100) as u16;
+        for offset in 0x00..0xA0 {
+            let data = self.read_u8(addr + offset);
+            self.write_u8(0xFE00 + offset, data);
+        }
+    }
+
     fn add_machine_cycles(&mut self, machine_cycles: u8) {
         self.cycles += (machine_cycles as u32) * 4;
     }
@@ -128,6 +141,7 @@ impl MMU {
     fn step(&mut self) {
         self.add_machine_cycles(1);
         self.timer.step(&mut self.interrupt);
+        self.lcd.step(&mut self.interrupt);
     }
 
     // for mysterious extra instruction delays. adds 1 machine cycle to the cycle counter

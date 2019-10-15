@@ -1,3 +1,5 @@
+use gameboy::interrupt::{InterruptHandler, Interrupt};
+
 pub enum TileDataAddressRange {
     TileDataAddr8800_97FF = 0,
     TileDataAddr8000_8FFF = 1,
@@ -26,15 +28,24 @@ bitflags!{
     }
 }
 
-bitflags!{
-    struct Status: u8 {
-        const LYCOINCIDENCE_INTERRUPT = 0x40;
-        const OAM_INTERRUPT = 0x20;
-        const VBLANK_INTERRUPT = 0x10;
-        const HBLANK_INTERRUPT = 0x08;
-        const COINCIDENCE_FLAG = 0x04;
-        const MODE_FLAG = 0x03;
-    }
+bitfield!{
+    struct Status(u8);
+    impl Debug;
+    // get, set: msb,lsb,count;
+    ly_coincidence_interrupt, _: 6;
+    oam_interrupt, _: 5;
+    vblank_interrupt, _: 4;
+    hblank_interrupt, _: 3;
+    coincidence_flag, set_coincidence_flag: 2;
+    mode_flag, set_mode_flag: 1,0;
+}
+
+#[derive(FromPrimitive)]
+enum Mode {
+    HBlank = 0b00,
+    VBlank = 0b01,
+    OAMSearch = 0b10,
+    Transfer = 0b11,
 }
 
 bitflags!{
@@ -93,6 +104,7 @@ pub struct LCD {
     scroll_y: u8,
     scroll_x: u8,
 
+    scanline_cycle_count: i16,
     lcd_y: u8, //TODO: more specialised than u8?
     lcd_y_compare: u8,
 
@@ -105,6 +117,13 @@ pub struct LCD {
 }
 
 impl LCD {
+    const SCANLINE_CYCLE_TOTAL: i16 = 456; // from the pandocs, total cycles to process one scanline
+    const MODE2_CYCLE_RANGE: i16 = LCD::SCANLINE_CYCLE_TOTAL - 80;
+    const MODE3_CYCLE_RANGE: i16 = LCD::MODE2_CYCLE_RANGE - 172;
+
+    const SCREEN_HEIGHT: u8 = 144;
+    const VBLANK_HEIGHT: u8 = 154;
+
     pub fn new() -> LCD {
         LCD {
             vram_tile_data: [0x0; 0x1800],
@@ -112,11 +131,12 @@ impl LCD {
             vram_oam: [OAM::new(); 40],
 
             control: Control::empty(),
-            status: Status::empty(),
+            status: Status { 0: 0x00 },
 
             scroll_y: 0x0,
             scroll_x: 0x0,
 
+            scanline_cycle_count: LCD::SCANLINE_CYCLE_TOTAL,
             lcd_y: 0x0,
             lcd_y_compare: 0x0,
 
@@ -132,12 +152,12 @@ impl LCD {
     pub fn read_register(&self, addr: u16) -> u8 {
         match addr {
             0xFF40 => self.control.bits() as u8,
-            0xFF41 => self.status.bits() as u8,
+            0xFF41 => self.status.0 as u8,
             0xFF42 => self.scroll_y,
             0xFF43 => self.scroll_x,
             0xFF44 => self.lcd_y,
             0xFF45 => self.lcd_y_compare,
-            0xFF46 => 0xFF, // DMA Transfer // TODO: write-only? what value do you get if you read?
+            0xFF46 => 0xFF, // DMA Transfer // TODO: write-only, I'm assuming the read value here
             0xFF47 => self.bg_palette.bits() as u8, // BG/Window palette
             0xFF48 => self.sprite_palette_0.bits() as u8, // sprite palette 0
             0xFF49 => self.sprite_palette_1.bits() as u8, // sprite palette 1
@@ -150,12 +170,12 @@ impl LCD {
     pub fn write_register(&mut self, addr: u16, value: u8) {
         match addr {
             0xFF40 => self.control = Control::from_bits_truncate(value as u8),
-            0xFF41 => self.status = Status::from_bits_truncate(value as u8),
+            0xFF41 => self.status.0 = value as u8,
             0xFF42 => self.scroll_y = value,
             0xFF43 => self.scroll_x = value,
             0xFF44 => self.lcd_y = 0x00, // writing resets this counter
             0xFF45 => self.lcd_y_compare = value,
-            0xFF46 => (), // DMA Transfer // TODO: implement this. it takes 160 cycles, 40 byte read/writes of 4 cycles each. unsure where the best place to implement would be, mmu has access to everything needed?
+            // 0xFF46 => (), // DMA Transfer - done in the mmu
             0xFF47 => self.bg_palette = Palette::from_bits_truncate(value as u8), // BG/Window palette
             0xFF48 => self.sprite_palette_0 = Palette::from_bits_truncate(value as u8), // sprite palette 0
             0xFF49 => self.sprite_palette_1 = Palette::from_bits_truncate(value as u8), // sprite palette 1
@@ -183,5 +203,78 @@ impl LCD {
             0x3 => self.vram_oam[addr as usize].attributes = Attributes::from_bits_truncate(value),
             _ => unreachable!(),
         }
+    }
+
+    pub fn step(&mut self, ih: &mut InterruptHandler) {
+        self.set_status(ih);
+
+        if !self.control.contains(Control::ENABLE) { return }
+
+        self.scanline_cycle_count -= 4;
+        if self.scanline_cycle_count > 0 { return }
+
+        self.scanline_cycle_count = LCD::SCANLINE_CYCLE_TOTAL;
+        self.lcd_y += 1;
+        match self.lcd_y {
+            LCD::SCREEN_HEIGHT => ih.set_interrupt(Interrupt::VBlank),
+            // TODO: pad this out to reduce lag?
+            // (give the emulated cpu more time than
+            // the actual hardware cpu would have had
+            // to process each frame)
+            LCD::VBLANK_HEIGHT => self.lcd_y = 0,
+            _ => self.draw_scanline(),
+        }
+    }
+
+    fn set_status(&mut self, ih: &mut InterruptHandler) {
+        // if the LCD is disabled, reset scanline cycles and y position, and force VBlank mode
+        if !self.control.contains(Control::ENABLE) {
+            self.scanline_cycle_count = LCD::SCANLINE_CYCLE_TOTAL;
+            self.lcd_y = 0;
+            self.status.set_mode_flag(Mode::VBlank as u8);
+            return;
+        }
+
+        // store current mode so we can detect changes
+        let prev_mode = self.status.mode_flag();
+        // set mode based on scanline y position and cycle count
+        if self.lcd_y >= LCD::SCREEN_HEIGHT {
+            self.status.set_mode_flag(Mode::VBlank as u8);
+        } else {
+            if self.scanline_cycle_count >= LCD::MODE2_CYCLE_RANGE as i16 {
+                self.status.set_mode_flag(Mode::OAMSearch as u8);
+            } else if self.scanline_cycle_count >= LCD::MODE3_CYCLE_RANGE as i16 {
+                self.status.set_mode_flag(Mode::Transfer as u8);
+            } else {
+                self.status.set_mode_flag(Mode::HBlank as u8);
+            }
+        }
+        // if mode changed, and interrupts for the new mode are enabled, set LCDC interrupt
+        if prev_mode != self.status.mode_flag() {
+            use num_traits::FromPrimitive;
+            match FromPrimitive::from_u8(self.status.mode_flag()) {
+                Some(Mode::HBlank) => if self.status.hblank_interrupt() { self.lcdc_interrupt(ih) },
+                Some(Mode::VBlank) => if self.status.vblank_interrupt() { self.lcdc_interrupt(ih) },
+                Some(Mode::OAMSearch) => if self.status.oam_interrupt() { self.lcdc_interrupt(ih) },
+                Some(Mode::Transfer) => (),
+                None => unreachable!(), // mode_flag is a 2-bit field
+            }
+        }
+
+        // flag and interrupt when we're on the game-specified scanline lcd_y_compare
+        if self.lcd_y == self.lcd_y_compare {
+            self.status.set_coincidence_flag(true);
+            if self.status.ly_coincidence_interrupt() { self.lcdc_interrupt(ih) }
+        } else {
+            self.status.set_coincidence_flag(false);
+        }
+    }
+
+    fn lcdc_interrupt(&self, ih: &mut InterruptHandler) {
+        ih.set_interrupt(Interrupt::LCDC);
+    }
+
+    fn draw_scanline(&self) {
+        // TODO: implement this :P
     }
 }
