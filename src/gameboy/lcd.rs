@@ -37,15 +37,33 @@ bitfield!{
     vblank_interrupt, _: 4;
     hblank_interrupt, _: 3;
     coincidence_flag, set_coincidence_flag: 2;
-    mode_flag, set_mode_flag: 1,0;
+    from into Mode, mode_flag, set_mode_flag: 1,0;
+    from into u8, bits, set_bits: 7,0;
 }
 
-#[derive(FromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Mode {
     HBlank = 0b00,
     VBlank = 0b01,
     OAMSearch = 0b10,
     Transfer = 0b11,
+}
+impl From<u8> for Mode {
+    fn from(value: u8) -> Mode {
+        use gameboy::lcd::Mode::*;
+        match value {
+            0b00 => HBlank,
+            0b01 => VBlank,
+            0b10 => OAMSearch,
+            0b11 => Transfer,
+            _ => unreachable!(), // 2 bit field
+        }
+    }
+}
+impl From<Mode> for u8 {
+    fn from(value: Mode) -> u8 {
+        value as u8
+    }
 }
 
 bitflags!{
@@ -77,21 +95,38 @@ impl OAM {
     }
 }
 
-bitflags!{
-    struct Palette: u8 {
-        const COLOR_3 = 0b1100_0000;
-        const COLOR_2 = 0b0011_0000;
-        const COLOR_1 = 0b0000_1100;
-        const COLOR_0 = 0b0000_0011;
-    }
+bitfield!{
+    struct Palette(u8);
+    impl Debug;
+    // get, set: msb,lsb,count;
+    from into Shade, color, set_color: 1,0,4;
+    from into u8, bits, set_bits: 7,0;
 }
 
-//enum Shade {
-//    White = 0b00,
-//    LightGray = 0b01,
-//    DarkGray = 0b10,
-//    Black = 0b11,
-//}
+#[derive(Clone, Copy, Debug)]
+enum Shade {
+    White = 0b00,
+    LightGray = 0b01,
+    DarkGray = 0b10,
+    Black = 0b11,
+}
+impl From<u8> for Shade {
+    fn from(value: u8) -> Shade {
+        use gameboy::lcd::Shade::*;
+        match value {
+            0b00 => White,
+            0b01 => LightGray,
+            0b10 => DarkGray,
+            0b11 => Black,
+            _ => unreachable!(), // 2 bit field
+        }
+    }
+}
+impl From<Shade> for u8 {
+    fn from(value: Shade) -> u8 {
+        value as u8
+    }
+}
 
 pub struct LCD {
     pub vram_tile_data: [u8; 0x1800], //0x8000-0x97FF
@@ -131,7 +166,7 @@ impl LCD {
             vram_oam: [OAM::new(); 40],
 
             control: Control::empty(),
-            status: Status { 0: 0x00 },
+            status: Status(0x00),
 
             scroll_y: 0x0,
             scroll_x: 0x0,
@@ -140,9 +175,9 @@ impl LCD {
             lcd_y: 0x0,
             lcd_y_compare: 0x0,
 
-            bg_palette: Palette::empty(),
-            sprite_palette_0: Palette::empty(),
-            sprite_palette_1: Palette::empty(),
+            bg_palette: Palette(0x00),
+            sprite_palette_0: Palette(0x00),
+            sprite_palette_1: Palette(0x00),
 
             window_y: 0x0,
             window_x: 0x0,
@@ -152,15 +187,15 @@ impl LCD {
     pub fn read_register(&self, addr: u16) -> u8 {
         match addr {
             0xFF40 => self.control.bits() as u8,
-            0xFF41 => self.status.0 as u8,
+            0xFF41 => self.status.bits(),
             0xFF42 => self.scroll_y,
             0xFF43 => self.scroll_x,
             0xFF44 => self.lcd_y,
             0xFF45 => self.lcd_y_compare,
             0xFF46 => 0xFF, // DMA Transfer // TODO: write-only, I'm assuming the read value here
-            0xFF47 => self.bg_palette.bits() as u8, // BG/Window palette
-            0xFF48 => self.sprite_palette_0.bits() as u8, // sprite palette 0
-            0xFF49 => self.sprite_palette_1.bits() as u8, // sprite palette 1
+            0xFF47 => self.bg_palette.bits(), // BG/Window palette
+            0xFF48 => self.sprite_palette_0.bits(), // sprite palette 0
+            0xFF49 => self.sprite_palette_1.bits(), // sprite palette 1
             0xFF4A => self.window_y,
             0xFF4B => self.window_x,
             _ => unreachable!(), // mmu will only send us addresses in 0xFF40 - 0xFF4B range
@@ -169,16 +204,16 @@ impl LCD {
 
     pub fn write_register(&mut self, addr: u16, value: u8) {
         match addr {
-            0xFF40 => self.control = Control::from_bits_truncate(value as u8),
-            0xFF41 => self.status.0 = value as u8,
+            0xFF40 => self.control = Control::from_bits_truncate(value),
+            0xFF41 => self.status.set_bits(value),
             0xFF42 => self.scroll_y = value,
             0xFF43 => self.scroll_x = value,
             0xFF44 => self.lcd_y = 0x00, // writing resets this counter
             0xFF45 => self.lcd_y_compare = value,
             // 0xFF46 => (), // DMA Transfer - done in the mmu
-            0xFF47 => self.bg_palette = Palette::from_bits_truncate(value as u8), // BG/Window palette
-            0xFF48 => self.sprite_palette_0 = Palette::from_bits_truncate(value as u8), // sprite palette 0
-            0xFF49 => self.sprite_palette_1 = Palette::from_bits_truncate(value as u8), // sprite palette 1
+            0xFF47 => self.bg_palette.set_bits(value), // BG/Window palette
+            0xFF48 => self.sprite_palette_0.set_bits(value), // sprite palette 0
+            0xFF49 => self.sprite_palette_1.set_bits(value), // sprite palette 1
             0xFF4A => self.window_y = value,
             0xFF4B => self.window_x = value,
             _ => unreachable!(), // mmu will only send us addresses in 0xFF40 - 0xFF4B range
@@ -231,7 +266,7 @@ impl LCD {
         if !self.control.contains(Control::ENABLE) {
             self.scanline_cycle_count = LCD::SCANLINE_CYCLE_TOTAL;
             self.lcd_y = 0;
-            self.status.set_mode_flag(Mode::VBlank as u8);
+            self.status.set_mode_flag(Mode::VBlank);
             return;
         }
 
@@ -239,25 +274,23 @@ impl LCD {
         let prev_mode = self.status.mode_flag();
         // set mode based on scanline y position and cycle count
         if self.lcd_y >= LCD::SCREEN_HEIGHT {
-            self.status.set_mode_flag(Mode::VBlank as u8);
+            self.status.set_mode_flag(Mode::VBlank);
         } else {
             if self.scanline_cycle_count >= LCD::MODE2_CYCLE_RANGE as i16 {
-                self.status.set_mode_flag(Mode::OAMSearch as u8);
+                self.status.set_mode_flag(Mode::OAMSearch);
             } else if self.scanline_cycle_count >= LCD::MODE3_CYCLE_RANGE as i16 {
-                self.status.set_mode_flag(Mode::Transfer as u8);
+                self.status.set_mode_flag(Mode::Transfer);
             } else {
-                self.status.set_mode_flag(Mode::HBlank as u8);
+                self.status.set_mode_flag(Mode::HBlank);
             }
         }
         // if mode changed, and interrupts for the new mode are enabled, set LCDC interrupt
         if prev_mode != self.status.mode_flag() {
-            use num_traits::FromPrimitive;
-            match FromPrimitive::from_u8(self.status.mode_flag()) {
-                Some(Mode::HBlank) => if self.status.hblank_interrupt() { self.lcdc_interrupt(ih) },
-                Some(Mode::VBlank) => if self.status.vblank_interrupt() { self.lcdc_interrupt(ih) },
-                Some(Mode::OAMSearch) => if self.status.oam_interrupt() { self.lcdc_interrupt(ih) },
-                Some(Mode::Transfer) => (),
-                None => unreachable!(), // mode_flag is a 2-bit field
+            match self.status.mode_flag() {
+                Mode::HBlank => if self.status.hblank_interrupt() { self.lcdc_interrupt(ih) },
+                Mode::VBlank => if self.status.vblank_interrupt() { self.lcdc_interrupt(ih) },
+                Mode::OAMSearch => if self.status.oam_interrupt() { self.lcdc_interrupt(ih) },
+                Mode::Transfer => (),
             }
         }
 
@@ -276,5 +309,20 @@ impl LCD {
 
     fn draw_scanline(&self) {
         // TODO: implement this :P
+        if self.control.contains(Control::BG_ENABLE) {
+            self.draw_bg();
+        }
+
+        if self.control.contains(Control::SPRITE_ENABLE) {
+            self.draw_sprites();
+        }
+    }
+
+    fn draw_bg(&self) {
+
+    }
+
+    fn draw_sprites(&self) {
+
     }
 }
