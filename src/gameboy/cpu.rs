@@ -777,13 +777,15 @@ impl CPU {
         let interrupt_enabled_flagged = mmu.interrupt.get_enabled_flags();
         let interrupt = interrupt_enabled_flagged.trailing_zeros();
 
-        let address = match interrupt {
-            0 => 0x0040,
-            1 => 0x0048,
-            2 => 0x0050,
-            3 => 0x0058,
-            4 => 0x0060,
-            _ => panic!("unrecognized interrupt flag at position {}", interrupt),
+        use gameboy::interrupt::Interrupt;
+        use num_traits::FromPrimitive;
+        let address = match FromPrimitive::from_u32(interrupt) {
+            Some(Interrupt::VBlank) => 0x0040,
+            Some(Interrupt::LCDC) => 0x0048,
+            Some(Interrupt::Timer) => 0x0050,
+            Some(Interrupt::SerialIOComplete) => 0x0058,
+            Some(Interrupt::Joypad) => 0x0060,
+            None => panic!("unrecognized interrupt flag at position {}", interrupt),
         };
 
         let flag = mmu.interrupt.get_flag();

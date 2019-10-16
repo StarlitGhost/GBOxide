@@ -1,3 +1,4 @@
+#[derive(FromPrimitive)]
 pub enum Interrupt {
     VBlank = 0,
     LCDC = 1,
