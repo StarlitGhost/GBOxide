@@ -15,17 +15,19 @@ pub enum SpriteSizes {
     Size8x16 = 1,
 }
 
-bitflags!{
-    struct Control: u8 {
-        const ENABLE = 0x80;
-        const WINDOW_MAP = 0x40;
-        const WINDOW_ENABLE = 0x20;
-        const TILE_DATA = 0x10;
-        const BG_MAP = 0x08;
-        const SPRITE_SIZE = 0x04;
-        const SPRITE_ENABLE = 0x02;
-        const BG_ENABLE = 0x01;
-    }
+bitfield!{
+    struct Control(u8);
+    impl Debug;
+    // get, set: msb,lsb,count;
+    enable, _: 7;
+    into TileMapAddressRange, window_map, _: 6;
+    window_enable, _: 5;
+    into TileDataAddressRange, tile_data, _: 4;
+    into TileMapAddressRange, bg_map, _: 3;
+    into SpriteSizes, sprite_size, _: 2;
+    sprite_enable, _: 1;
+    bg_enable, _: 0;
+    from into u8, bits, set_bits: 7,0;
 }
 
 bitfield!{
@@ -165,7 +167,7 @@ impl LCD {
             vram_bg_maps: [0x0; 0x800],
             vram_oam: [OAM::new(); 40],
 
-            control: Control::empty(),
+            control: Control(0x00),
             status: Status(0x00),
 
             scroll_y: 0x0,
@@ -204,7 +206,7 @@ impl LCD {
 
     pub fn write_register(&mut self, addr: u16, value: u8) {
         match addr {
-            0xFF40 => self.control = Control::from_bits_truncate(value),
+            0xFF40 => self.control.set_bits(value),
             0xFF41 => self.status.set_bits(value),
             0xFF42 => self.scroll_y = value,
             0xFF43 => self.scroll_x = value,
@@ -243,7 +245,7 @@ impl LCD {
     pub fn step(&mut self, ih: &mut InterruptHandler) {
         self.set_status(ih);
 
-        if !self.control.contains(Control::ENABLE) { return }
+        if !self.control.enable() { return }
 
         self.scanline_cycle_count -= 4;
         if self.scanline_cycle_count > 0 { return }
@@ -263,7 +265,7 @@ impl LCD {
 
     fn set_status(&mut self, ih: &mut InterruptHandler) {
         // if the LCD is disabled, reset scanline cycles and y position, and force VBlank mode
-        if !self.control.contains(Control::ENABLE) {
+        if !self.control.enable() {
             self.scanline_cycle_count = LCD::SCANLINE_CYCLE_TOTAL;
             self.lcd_y = 0;
             self.status.set_mode_flag(Mode::VBlank);
@@ -309,11 +311,11 @@ impl LCD {
 
     fn draw_scanline(&self) {
         // TODO: implement this :P
-        if self.control.contains(Control::BG_ENABLE) {
+        if self.control.bg_enable() {
             self.draw_bg();
         }
 
-        if self.control.contains(Control::SPRITE_ENABLE) {
+        if self.control.sprite_enable() {
             self.draw_sprites();
         }
     }
