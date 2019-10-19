@@ -8,11 +8,93 @@ use std::num::Wrapping;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
+#[allow(non_camel_case_types)]
+#[derive(Clone, Copy, Debug)]
+pub enum CartridgeType {
+    ROM  = 0x00, ROM_RAM  = 0x08, ROM_RAM_BATTERY  = 0x09,
+    MBC1 = 0x01, MBC1_RAM = 0x02, MBC1_RAM_BATTERY = 0x03,
+    MBC2 = 0x05,                  MBC2_RAM_BATTERY = 0x06,
+    MBC3 = 0x11, MBC3_RAM = 0x12, MBC3_RAM_BATTERY = 0x13,
+}
+impl fmt::Display for CartridgeType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::CartridgeType::*;
+        write!(f, "{}", match *self {
+            ROM => "ROM ONLY",
+            ROM_RAM => "ROM+RAM",
+            ROM_RAM_BATTERY => "ROM+RAM+BATTERY",
+            MBC1 => "MBC1",
+            MBC1_RAM => "MBC1+RAM",
+            MBC1_RAM_BATTERY => "MBC1+RAM+BATTERY",
+            MBC2 => "MBC2",
+            MBC2_RAM_BATTERY => "MBC2+RAM+BATTERY",
+            MBC3 => "MBC3",
+            MBC3_RAM => "MBC3+RAM",
+            MBC3_RAM_BATTERY => "MBC3+RAM+BATTERY",
+        })
+    }
+}
+
+pub struct Cartridge {
+    pub header: Header,
+    mbc: Box<dyn MBC>,
+}
+
+impl Cartridge {
+    pub fn new(filename: &str) -> Result<Cartridge, Box<dyn Error>> {
+        let mut f = File::open(filename)?;
+        let mut rom = Vec::new();
+        f.read_to_end(&mut rom)?;
+        let mut header_bytes = [0; 0x50];
+        header_bytes.copy_from_slice(&rom[0x100..0x150]);
+        let header = Header::new(header_bytes)?;
+
+        let mbc: Box<dyn MBC> = match header.cartridge_type {
+            CartridgeType::ROM => Box::new(ROM::new(rom)),
+            CartridgeType::MBC1 => Box::new(MBC1::new(&header, rom)),
+            _ => panic!("Cartridge type {:?} is not yet implemented", header.cartridge_type),
+        };
+
+        Ok(Cartridge { header, mbc })
+    }
+
+    pub fn read(&self, addr: u16) -> u8 {
+        self.mbc.read(addr)
+    }
+
+    pub fn write(&mut self, addr: u16, value: u8) {
+        self.mbc.write(addr, value);
+    }
+
+    pub fn rom_len(&self) -> usize {
+        self.mbc.rom_len()
+    }
+}
+
 trait MBC {
     fn read(&self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, value: u8);
 
     fn rom_len(&self) -> usize;
+}
+
+struct ROM {
+    rom: Vec<u8>,
+}
+
+impl MBC for ROM {
+    fn read(&self, addr: u16) -> u8 {
+        match addr {
+            0x0000 ..= 0x7FFF => self.rom[addr as usize],
+            _ => 0xFF,
+        }
+    }
+    fn write(&mut self, _addr: u16, _value: u8) {}
+
+    fn rom_len(&self) -> usize { self.rom.len() }
+}
+impl ROM {
+    fn new(rom: Vec<u8>) -> ROM { ROM { rom } }
 }
 
 struct MBC1 {
@@ -22,6 +104,36 @@ struct MBC1 {
     ram_bank_selection: u8,
     ram_enabled: bool,
     ram_select_mode: bool,
+}
+
+impl MBC for MBC1 {
+    fn read(&self, addr: u16) -> u8 {
+        match addr {
+            0x0000 ..= 0x3FFF => self.rom[addr as usize],
+            0x4000 ..= 0x7FFF => self.read_selected_rom_bank(addr),
+            0xA000 ..= 0xBFFF => self.read_selected_ram_bank(addr),
+            _ => unreachable!(), // the mmu should only send us addresses in these ranges
+        }
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        match addr {
+            0x0000 ..= 0x1FFF => self.enable_ram(value),
+            0x2000 ..= 0x3FFF => self.select_rom_bank_lower_bits(value),
+            0x4000 ..= 0x5FFF => if self.ram_select_mode {
+                self.select_ram_bank(value)
+            } else {
+                self.select_rom_bank_upper_bits(value)
+            },
+            0x6000 ..= 0x7FFF => self.ram_select_mode = match value & 0x1 { 0x01 => true, _ => false },
+            0xA000 ..= 0xBFFF => self.write_selected_ram_bank(addr, value),
+            _ => unreachable!(), // mmu will only pass us addresses in this range
+        };
+    }
+
+    fn rom_len(&self) -> usize {
+        self.rom.len()
+    }
 }
 
 impl MBC1 {
@@ -83,99 +195,6 @@ impl MBC1 {
     fn select_rom_bank_upper_bits(&mut self, value: u8) {
         self.rom_bank_selection &= 0b0001_1111;
         self.rom_bank_selection |= (value & 0b11) << 5;
-    }
-}
-
-impl MBC for MBC1 {
-    fn read(&self, addr: u16) -> u8 {
-        match addr {
-            0x0000 ..= 0x3FFF => self.rom[addr as usize],
-            0x4000 ..= 0x7FFF => self.read_selected_rom_bank(addr),
-            0xA000 ..= 0xBFFF => self.read_selected_ram_bank(addr),
-            _ => unreachable!(), // the mmu should only send us addresses in these ranges
-        }
-    }
-
-    fn write(&mut self, addr: u16, value: u8) {
-        match addr {
-            0x0000 ..= 0x1FFF => self.enable_ram(value),
-            0x2000 ..= 0x3FFF => self.select_rom_bank_lower_bits(value),
-            0x4000 ..= 0x5FFF => if self.ram_select_mode {
-                self.select_ram_bank(value)
-            } else {
-                self.select_rom_bank_upper_bits(value)
-            },
-            0x6000 ..= 0x7FFF => self.ram_select_mode = match value & 0x1 { 0x01 => true, _ => false },
-            0xA000 ..= 0xBFFF => self.write_selected_ram_bank(addr, value),
-            _ => unreachable!(), // mmu will only pass us addresses in this range
-        };
-    }
-
-    fn rom_len(&self) -> usize {
-        self.rom.len()
-    }
-}
-
-pub struct Cartridge {
-    pub header: Header,
-    mbc: Box<dyn MBC>,
-}
-
-impl Cartridge {
-    pub fn new(filename: &str) -> Result<Cartridge, Box<dyn Error>> {
-        let mut f = File::open(filename)?;
-        let mut rom = Vec::new();
-        f.read_to_end(&mut rom)?;
-        let mut header_bytes = [0; 0x50];
-        header_bytes.copy_from_slice(&rom[0x100..0x150]);
-        let header = Header::new(header_bytes)?;
-
-        let mbc = match header.cartridge_type {
-            CartridgeType::MBC1 => Box::new(MBC1::new(&header, rom)),
-            _ => panic!("Cartridge type {:?} is not yet implemented", header.cartridge_type),
-        };
-
-        Ok(Cartridge { header, mbc })
-    }
-
-    pub fn read(&self, addr: u16) -> u8 {
-        self.mbc.read(addr)
-    }
-
-    pub fn write(&mut self, addr: u16, value: u8) {
-        self.mbc.write(addr, value);
-    }
-
-    pub fn rom_len(&self) -> usize {
-        self.mbc.rom_len()
-    }
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Clone, Copy, Debug)]
-pub enum CartridgeType {
-    ROM  = 0x00, ROM_RAM  = 0x08, ROM_RAM_BATTERY  = 0x09,
-    MBC1 = 0x01, MBC1_RAM = 0x02, MBC1_RAM_BATTERY = 0x03,
-    MBC2 = 0x05,                  MBC2_RAM_BATTERY = 0x06,
-    MBC3 = 0x11, MBC3_RAM = 0x12, MBC3_RAM_BATTERY = 0x13,
-}
-
-impl fmt::Display for CartridgeType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::CartridgeType::*;
-        write!(f, "{}", match *self {
-            ROM => "ROM ONLY",
-            ROM_RAM => "ROM+RAM",
-            ROM_RAM_BATTERY => "ROM+RAM+BATTERY",
-            MBC1 => "MBC1",
-            MBC1_RAM => "MBC1+RAM",
-            MBC1_RAM_BATTERY => "MBC1+RAM+BATTERY",
-            MBC2 => "MBC2",
-            MBC2_RAM_BATTERY => "MBC2+RAM+BATTERY",
-            MBC3 => "MBC3",
-            MBC3_RAM => "MBC3+RAM",
-            MBC3_RAM_BATTERY => "MBC3+RAM+BATTERY",
-        })
     }
 }
 
