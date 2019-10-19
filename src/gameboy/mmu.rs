@@ -127,7 +127,7 @@ impl MMU {
         // copies data from rom/ram to oam sprite memory
         // the value written is the address to read from, divided by 100
         // takes 160 cycles, 40 single byte read/writes of 4 cycles each
-        let addr = (value * 100) as u16;
+        let addr = value as u16 * 100;
         for offset in 0x00..0xA0 {
             let data = self.read_u8(addr + offset);
             self.write_u8(0xFE00 + offset, data);
