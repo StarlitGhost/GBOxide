@@ -6,6 +6,7 @@ extern crate byteorder;
 #[macro_use]
 extern crate num_derive;
 extern crate num_traits;
+extern crate png;
 
 pub mod cartridge;
 pub mod gameboy;

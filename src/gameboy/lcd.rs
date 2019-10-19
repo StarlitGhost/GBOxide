@@ -1,18 +1,66 @@
 use gameboy::interrupt::{InterruptHandler, Interrupt};
 
+#[derive(Clone, Copy, Debug)]
 pub enum TileDataAddressRange {
     TileDataAddr8800_97FF = 0,
     TileDataAddr8000_8FFF = 1,
 }
+impl From<u8> for TileDataAddressRange {
+    fn from(value: u8) -> TileDataAddressRange {
+        use gameboy::lcd::TileDataAddressRange::*;
+        match value {
+            0b0 => TileDataAddr8000_8FFF,
+            0b1 => TileDataAddr8800_97FF,
+            _ => unreachable!(), // 1 bit field
+        }
+    }
+}
+impl From<TileDataAddressRange> for u8 {
+    fn from(value: TileDataAddressRange) -> u8 {
+        value as u8
+    }
+}
 
+#[derive(Clone, Copy, Debug)]
 pub enum TileMapAddressRange {
     TileMapAddr9800_9BFF = 0,
     TileMapAddr9C00_9FFF = 1,
 }
+impl From<u8> for TileMapAddressRange {
+    fn from(value: u8) -> TileMapAddressRange {
+        use gameboy::lcd::TileMapAddressRange::*;
+        match value {
+            0b0 => TileMapAddr9800_9BFF,
+            0b1 => TileMapAddr9C00_9FFF,
+            _ => unreachable!(), // 1 bit field
+        }
+    }
+}
+impl From<TileMapAddressRange> for u8 {
+    fn from(value: TileMapAddressRange) -> u8 {
+        value as u8
+    }
+}
 
+#[derive(Clone, Copy, Debug)]
 pub enum SpriteSizes {
     Size8x8 = 0,
     Size8x16 = 1,
+}
+impl From<u8> for SpriteSizes {
+    fn from(value: u8) -> SpriteSizes {
+        use gameboy::lcd::SpriteSizes::*;
+        match value {
+            0b0 => Size8x8,
+            0b1 => Size8x16,
+            _ => unreachable!(), // 1 bit field
+        }
+    }
+}
+impl From<SpriteSizes> for u8 {
+    fn from(value: SpriteSizes) -> u8 {
+        value as u8
+    }
 }
 
 bitfield!{
@@ -20,26 +68,13 @@ bitfield!{
     impl Debug;
     // get, set: msb,lsb,count;
     enable, _: 7;
-    into TileMapAddressRange, window_map, _: 6;
+    from into TileMapAddressRange, window_map, _: 6,6;
     window_enable, _: 5;
-    into TileDataAddressRange, tile_data, _: 4;
-    into TileMapAddressRange, bg_map, _: 3;
-    into SpriteSizes, sprite_size, _: 2;
+    from into TileDataAddressRange, tile_data, _: 4,4;
+    from into TileMapAddressRange, bg_map, _: 3,3;
+    from into SpriteSizes, sprite_size, _: 2,2;
     sprite_enable, _: 1;
     bg_enable, _: 0;
-    from into u8, bits, set_bits: 7,0;
-}
-
-bitfield!{
-    struct Status(u8);
-    impl Debug;
-    // get, set: msb,lsb,count;
-    ly_coincidence_interrupt, _: 6;
-    oam_interrupt, _: 5;
-    vblank_interrupt, _: 4;
-    hblank_interrupt, _: 3;
-    coincidence_flag, set_coincidence_flag: 2;
-    from into Mode, mode_flag, set_mode_flag: 1,0;
     from into u8, bits, set_bits: 7,0;
 }
 
@@ -66,6 +101,19 @@ impl From<Mode> for u8 {
     fn from(value: Mode) -> u8 {
         value as u8
     }
+}
+
+bitfield!{
+    struct Status(u8);
+    impl Debug;
+    // get, set: msb,lsb,count;
+    ly_coincidence_interrupt, _: 6;
+    oam_interrupt, _: 5;
+    vblank_interrupt, _: 4;
+    hblank_interrupt, _: 3;
+    coincidence_flag, set_coincidence_flag: 2;
+    from into Mode, mode_flag, set_mode_flag: 1,0;
+    from into u8, bits, set_bits: 7,0;
 }
 
 bitflags!{
@@ -101,7 +149,7 @@ bitfield!{
     struct Palette(u8);
     impl Debug;
     // get, set: msb,lsb,count;
-    from into Shade, color, set_color: 1,0,4;
+    from into Shade, colour, set_colour: 1,0,4;
     from into u8, bits, set_bits: 7,0;
 }
 
@@ -132,7 +180,7 @@ impl From<Shade> for u8 {
 
 pub struct LCD {
     pub vram_tile_data: [u8; 0x1800], //0x8000-0x97FF
-    pub vram_bg_maps: [u8; 0x800],    //0x9800-0x9FFF
+    pub vram_bg_maps: [u8; 0x0800],    //0x9800-0x9FFF
     pub vram_oam: [OAM; 40],          //0xFE00-0xFE9F
 
     control: Control,
@@ -151,6 +199,8 @@ pub struct LCD {
 
     window_y: u8,
     window_x: u8,
+
+    frame: [u8; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4],
 }
 
 impl LCD {
@@ -158,37 +208,40 @@ impl LCD {
     const MODE2_CYCLE_RANGE: i16 = LCD::SCANLINE_CYCLE_TOTAL - 80;
     const MODE3_CYCLE_RANGE: i16 = LCD::MODE2_CYCLE_RANGE - 172;
 
+    const SCREEN_WIDTH: u8 = 160;
     const SCREEN_HEIGHT: u8 = 144;
     const VBLANK_HEIGHT: u8 = 154;
 
     pub fn new() -> LCD {
         LCD {
-            vram_tile_data: [0x0; 0x1800],
-            vram_bg_maps: [0x0; 0x800],
+            vram_tile_data: [0x00; 0x1800],
+            vram_bg_maps: [0x00; 0x0800],
             vram_oam: [OAM::new(); 40],
 
             control: Control(0x00),
             status: Status(0x00),
 
-            scroll_y: 0x0,
-            scroll_x: 0x0,
+            scroll_y: 0x00,
+            scroll_x: 0x00,
 
             scanline_cycle_count: LCD::SCANLINE_CYCLE_TOTAL,
-            lcd_y: 0x0,
-            lcd_y_compare: 0x0,
+            lcd_y: 0x00,
+            lcd_y_compare: 0x00,
 
             bg_palette: Palette(0x00),
             sprite_palette_0: Palette(0x00),
             sprite_palette_1: Palette(0x00),
 
-            window_y: 0x0,
-            window_x: 0x0,
+            window_y: 0x00,
+            window_x: 0x00,
+
+            frame: [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4],
         }
     }
 
     pub fn read_register(&self, addr: u16) -> u8 {
         match addr {
-            0xFF40 => self.control.bits() as u8,
+            0xFF40 => self.control.bits(),
             0xFF41 => self.status.bits(),
             0xFF42 => self.scroll_y,
             0xFF43 => self.scroll_x,
@@ -224,20 +277,20 @@ impl LCD {
 
     pub fn read_oam(&self, addr: u16) -> u8 {
         match addr % 4 {
-            0x0 => self.vram_oam[addr as usize].y_position,
-            0x1 => self.vram_oam[addr as usize].x_position,
-            0x2 => self.vram_oam[addr as usize].tile_number,
-            0x3 => self.vram_oam[addr as usize].attributes.bits() as u8,
+            0x0 => self.vram_oam[addr as usize / 4].y_position,
+            0x1 => self.vram_oam[addr as usize / 4].x_position,
+            0x2 => self.vram_oam[addr as usize / 4].tile_number,
+            0x3 => self.vram_oam[addr as usize / 4].attributes.bits() as u8,
             _ => unreachable!(),
         }
     }
 
     pub fn write_oam(&mut self, addr: u16, value: u8) {
         match addr % 4 {
-            0x0 => self.vram_oam[addr as usize].y_position = value,
-            0x1 => self.vram_oam[addr as usize].x_position = value,
-            0x2 => self.vram_oam[addr as usize].tile_number = value,
-            0x3 => self.vram_oam[addr as usize].attributes = Attributes::from_bits_truncate(value),
+            0x0 => self.vram_oam[addr as usize / 4].y_position = value,
+            0x1 => self.vram_oam[addr as usize / 4].x_position = value,
+            0x2 => self.vram_oam[addr as usize / 4].tile_number = value,
+            0x3 => self.vram_oam[addr as usize / 4].attributes = Attributes::from_bits_truncate(value),
             _ => unreachable!(),
         }
     }
@@ -253,13 +306,14 @@ impl LCD {
         self.scanline_cycle_count = LCD::SCANLINE_CYCLE_TOTAL;
         self.lcd_y += 1;
         match self.lcd_y {
+            0..=LCD::SCREEN_HEIGHT if self.lcd_y < LCD::SCREEN_HEIGHT => self.draw_scanline(),
             LCD::SCREEN_HEIGHT => ih.set_interrupt(Interrupt::VBlank),
             // TODO: pad this out to reduce lag?
             // (give the emulated cpu more time than
             // the actual hardware cpu would have had
             // to process each frame)
             LCD::VBLANK_HEIGHT => self.lcd_y = 0,
-            _ => self.draw_scanline(),
+            _ => (),
         }
     }
 
@@ -290,7 +344,7 @@ impl LCD {
         if prev_mode != self.status.mode_flag() {
             match self.status.mode_flag() {
                 Mode::HBlank => if self.status.hblank_interrupt() { self.lcdc_interrupt(ih) },
-                Mode::VBlank => if self.status.vblank_interrupt() { self.lcdc_interrupt(ih) },
+                Mode::VBlank => self.vblank(ih),
                 Mode::OAMSearch => if self.status.oam_interrupt() { self.lcdc_interrupt(ih) },
                 Mode::Transfer => (),
             }
@@ -305,12 +359,18 @@ impl LCD {
         }
     }
 
+    fn vblank(&self, ih: &mut InterruptHandler) {
+        if self.status.vblank_interrupt() {
+            self.lcdc_interrupt(ih);
+        }
+        self.save_frame();
+    }
+
     fn lcdc_interrupt(&self, ih: &mut InterruptHandler) {
         ih.set_interrupt(Interrupt::LCDC);
     }
 
-    fn draw_scanline(&self) {
-        // TODO: implement this :P
+    fn draw_scanline(&mut self) {
         if self.control.bg_enable() {
             self.draw_bg();
         }
@@ -320,11 +380,90 @@ impl LCD {
         }
     }
 
-    fn draw_bg(&self) {
+    fn draw_bg(&mut self) {
+        use gameboy::lcd::TileDataAddressRange::*;
+        use gameboy::lcd::TileMapAddressRange::*;
+        let in_window = self.control.window_enable() && self.lcd_y >= self.window_y;
 
+        let tile_data_offset = match self.control.tile_data() {
+            TileDataAddr8000_8FFF => 0x0000 as u16,
+            TileDataAddr8800_97FF => 0x0800 as u16,
+        };
+
+        let map = if in_window { self.control.window_map() } else { self.control.bg_map() };
+        let tile_map_offset = match map {
+            TileMapAddr9800_9BFF => 0x0000 as u16,
+            TileMapAddr9C00_9FFF => 0x0400 as u16,
+        };
+
+        let map_y = if in_window {
+            self.lcd_y - self.window_y
+        } else {
+            self.scroll_y.wrapping_add(self.lcd_y)
+        };
+
+        let tile_y = (map_y / 8) as u16;
+
+        for pixel_x in 0..LCD::SCREEN_WIDTH {
+            // TODO: optimize this loop to do blocks of 8 pixels?
+            // otherwise we calculate the addresses of and read the same bytes 8 times
+            let map_x = if in_window && pixel_x >= self.window_x - 7 {
+                // translate to window space if we're in it
+                pixel_x - (self.window_x - 7)
+            } else {
+                pixel_x + self.scroll_x
+            };
+
+            let tile_x = (map_x / 8) as u16;
+
+            let tile_map_addr = tile_map_offset + (tile_y * 32) + tile_x;
+
+            let tile_id = match self.control.tile_data() {
+                TileDataAddr8000_8FFF => self.vram_bg_maps[tile_map_addr as usize] as u16,
+                TileDataAddr8800_97FF => (self.vram_bg_maps[tile_map_addr as usize] as i16 + 128) as u16,
+            };
+
+            let tile_data_addr = tile_data_offset + (tile_id * 16);
+            let tile_row_offset = ((map_y % 8) * 2) as u16;
+
+            let pixel_start = (tile_data_addr + tile_row_offset) as usize;
+            let pixel_end = pixel_start + 1;
+            let pixel_data = &self.vram_tile_data[pixel_start..=pixel_end];
+            
+            let pixel_bit = 7 - (map_x % 8);
+            let colour_id = (((pixel_data[1] >> pixel_bit) & 0b1) << 1) |
+                ((pixel_data[0] >> pixel_bit) & 0b1);
+            let shade = self.bg_palette.colour(colour_id as usize);
+
+            let pixel = match shade {
+                Shade::White => [0xFF, 0xFF, 0xFF, 0xFF],
+                Shade::LightGray => [0xCC, 0xCC, 0xCC, 0xFF],
+                Shade::DarkGray => [0x77, 0x77, 0x77, 0xFF],
+                Shade::Black => [0x00, 0x00, 0x00, 0xFF],
+            };
+            let frame_pixel_start = (self.lcd_y as usize * LCD::SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
+            let frame_pixel_end = frame_pixel_start + 4;
+            let pixel_slice = &mut self.frame[frame_pixel_start..frame_pixel_end];
+            pixel_slice.clone_from_slice(&pixel[..4]);
+        }
     }
 
     fn draw_sprites(&self) {
 
+    }
+
+    fn save_frame(&self) {
+        use std::path::Path;
+        use std::fs::File;
+        use std::io::BufWriter;
+        let path = Path::new(r"./frame.png");
+        let file = File::create(path).unwrap();
+        let ref mut w = BufWriter::new(file);
+
+        let mut png_encoder = png::Encoder::new(w, LCD::SCREEN_WIDTH as u32, LCD::SCREEN_HEIGHT as u32);
+        png_encoder.set_color(png::ColorType::RGBA);
+        png_encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = png_encoder.write_header().unwrap();
+        writer.write_image_data(&self.frame).unwrap();
     }
 }
