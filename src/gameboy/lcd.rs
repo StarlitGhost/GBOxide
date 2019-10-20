@@ -304,7 +304,6 @@ impl LCD {
         if self.scanline_cycle_count > 0 { return }
 
         self.scanline_cycle_count = LCD::SCANLINE_CYCLE_TOTAL;
-        self.lcd_y += 1;
         match self.lcd_y {
             0..=LCD::SCREEN_HEIGHT if self.lcd_y < LCD::SCREEN_HEIGHT => self.draw_scanline(),
             LCD::SCREEN_HEIGHT => ih.set_interrupt(Interrupt::VBlank),
@@ -315,6 +314,8 @@ impl LCD {
             LCD::VBLANK_HEIGHT => self.lcd_y = 0,
             _ => (),
         }
+
+        self.lcd_y += 1;
     }
 
     fn set_status(&mut self, ih: &mut InterruptHandler) {
@@ -411,7 +412,7 @@ impl LCD {
                 // translate to window space if we're in it
                 pixel_x - (self.window_x - 7)
             } else {
-                pixel_x + self.scroll_x
+                pixel_x.wrapping_add(self.scroll_x)
             };
 
             let tile_x = (map_x / 8) as u16;
@@ -420,7 +421,7 @@ impl LCD {
 
             let tile_id = match self.control.tile_data() {
                 TileDataAddr8000_8FFF => self.vram_bg_maps[tile_map_addr as usize] as u16,
-                TileDataAddr8800_97FF => (self.vram_bg_maps[tile_map_addr as usize] as i16 + 128) as u16,
+                TileDataAddr8800_97FF => (self.vram_bg_maps[tile_map_addr as usize] as i8 as i16 + 128) as u16,
             };
 
             let tile_data_addr = tile_data_offset + (tile_id * 16);
