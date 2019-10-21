@@ -180,6 +180,17 @@ impl From<Shade> for u8 {
         value as u8
     }
 }
+impl Shade {
+    fn into_pixel(&self) -> &[u8] {
+        use gameboy::lcd::Shade::*;
+        match *self {
+            White => &[0xFF, 0xFF, 0xFF, 0xFF],
+            LightGray => &[0xCC, 0xCC, 0xCC, 0xFF],
+            DarkGray => &[0x77, 0x77, 0x77, 0xFF],
+            Black => &[0x00, 0x00, 0x00, 0xFF],
+        }
+    }
+}
 
 pub struct LCD {
     pub vram_tile_data: [u8; 0x1800], //0x8000-0x97FF
@@ -377,6 +388,7 @@ impl LCD {
         }
         self.save_frame();
         self.frame = [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4];
+        self.save_tile_data();
     }
 
     fn lcdc_interrupt(&self, ih: &mut InterruptHandler) {
@@ -444,16 +456,10 @@ impl LCD {
             let pixel_data = &self.vram_tile_data[pixel_start..=pixel_end];
             
             let pixel_bit = 7 - (map_x % 8);
-            let colour_id = (((pixel_data[1] >> pixel_bit) & 0b1) << 1) |
-                ((pixel_data[0] >> pixel_bit) & 0b1);
-            let shade = self.bg_palette.colour(colour_id as usize);
 
-            let pixel = match shade {
-                Shade::White => [0xFF, 0xFF, 0xFF, 0xFF],
-                Shade::LightGray => [0xCC, 0xCC, 0xCC, 0xFF],
-                Shade::DarkGray => [0x77, 0x77, 0x77, 0xFF],
-                Shade::Black => [0x00, 0x00, 0x00, 0xFF],
-            };
+            let shade = self.get_shade(pixel_data, pixel_bit, &self.bg_palette);
+            let pixel = shade.into_pixel();
+
             let frame_pixel_start = (self.lcd_y as usize * LCD::SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
             let frame_pixel_end = frame_pixel_start + 4;
             let pixel_slice = &mut self.frame[frame_pixel_start..frame_pixel_end];
@@ -493,20 +499,15 @@ impl LCD {
                     7 - sprite_column
                 };
 
-                let colour_id = (((pixel_data[1] >> pixel_bit) & 0b1) << 1) |
-                    ((pixel_data[0] >> pixel_bit) & 0b1);
                 let palette = match sprite.attributes.palette() {
                     0 => &self.sprite_palette_0,
                     1 => &self.sprite_palette_1,
                     _ => unreachable!(), // 1 bit field
                 };
-                let shade = palette.colour(colour_id as usize);
-
+                let shade = self.get_shade(pixel_data, pixel_bit, palette);
                 let pixel = match shade {
                     Shade::White => continue, // white is transparent for sprites
-                    Shade::LightGray => [0xCC, 0xCC, 0xCC, 0xFF],
-                    Shade::DarkGray => [0x77, 0x77, 0x77, 0xFF],
-                    Shade::Black => [0x00, 0x00, 0x00, 0xFF],
+                    _ => shade.into_pixel(),
                 };
 
                 let pixel_x = sprite.x_position - 8 + sprite_column;
@@ -516,6 +517,12 @@ impl LCD {
                 pixel_slice.clone_from_slice(&pixel[..4]);
             }
         }
+    }
+
+    fn get_shade(&self, pixel_data: &[u8], pixel_bit: u8, palette: &Palette) -> Shade {
+        let colour_id = (((pixel_data[1] >> pixel_bit) & 0b1) << 1) |
+            ((pixel_data[0] >> pixel_bit) & 0b1);
+        palette.colour(colour_id as usize)
     }
 
     fn save_frame(&self) {
@@ -531,5 +538,44 @@ impl LCD {
         png_encoder.set_depth(png::BitDepth::Eight);
         let mut writer = png_encoder.write_header().unwrap();
         writer.write_image_data(&self.frame).unwrap();
+    }
+
+    fn save_tile_data(&self) {
+        use std::path::Path;
+        use std::fs::File;
+        use std::io::BufWriter;
+        let path = Path::new(r"./tiledata.png");
+        let file = File::create(path).unwrap();
+        let ref mut w = BufWriter::new(file);
+
+        let mut png_encoder = png::Encoder::new(w, 256, 96);
+        png_encoder.set_color(png::ColorType::RGBA);
+        png_encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = png_encoder.write_header().unwrap();
+
+        let mut tile_pixels = [0x00; 256 * 96 * 4];
+        for line in 0..96 {
+            let tile_row_offset = (line % 8) * 2;
+            for col in 0..256u16 {
+                let tile_id = (line / 8) * 32 + (col / 8);
+                let tile_data_offset = tile_id * 16;
+
+                let pixel_start = (tile_data_offset + tile_row_offset) as usize;
+                let pixel_end = pixel_start + 1;
+                let pixel_data = &self.vram_tile_data[pixel_start..=pixel_end];
+                
+                let pixel_bit = 7 - (col % 8);
+
+                let shade = self.get_shade(pixel_data, pixel_bit as u8, &self.bg_palette);
+                let pixel = shade.into_pixel();
+
+                let pixel_start = (line as usize * 256 as usize * 4) + (col as usize * 4);
+                let pixel_end = pixel_start + 4;
+                let pixel_slice = &mut tile_pixels[pixel_start..pixel_end];
+                pixel_slice.clone_from_slice(&pixel[..4]);
+            }
+        }
+        
+        writer.write_image_data(&tile_pixels).unwrap();
     }
 }
