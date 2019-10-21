@@ -9,8 +9,8 @@ impl From<u8> for TileDataAddressRange {
     fn from(value: u8) -> TileDataAddressRange {
         use gameboy::lcd::TileDataAddressRange::*;
         match value {
-            0b0 => TileDataAddr8000_8FFF,
-            0b1 => TileDataAddr8800_97FF,
+            0b1 => TileDataAddr8000_8FFF,
+            0b0 => TileDataAddr8800_97FF,
             _ => unreachable!(), // 1 bit field
         }
     }
