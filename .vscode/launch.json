@@ -5,15 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "lldb",
+            "type": "gdb",
             "request": "launch",
-            "name": "Debug",
-            "program": "${workspaceFolder}/target/debug/gboxide",
-            "args": ["${workspaceFolder}/roms/test/02-interrupts.gb"],
-            "cwd": "${workspaceFolder}",
-            "env":{
-                "RUST_BACKTRACE": "1",
-            }
+            "name": "Launch Program",
+            "target": "./target/debug/gboxide",
+            "arguments": "./roms/tetris.gb",
+            "env": {"RUST_BACKTRACE": "1"},
+            "cwd": "${workspaceRoot}",
+            "valuesFormatting": "parseText"
         }
     ]
 }

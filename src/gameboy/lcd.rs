@@ -116,14 +116,17 @@ bitfield!{
     from into u8, bits, set_bits: 7,0;
 }
 
-bitflags!{
-    struct Attributes: u8 {
-        const OBJ_TO_BG_PRIORITY = 0x80;
-        const YFLIP = 0x40;
-        const XFLIP = 0x20;
-        const PALETTE = 0x10;
-        // the lower byte is CGB only
-    }
+bitfield!{
+    #[derive(Clone, Copy)]
+    struct Attributes(u8);
+    impl Debug;
+    // get, set: msb,lsb,count;
+    obj_to_bg_priority, _: 7;
+    y_flip, _: 6;
+    x_flip, _: 5;
+    u8, palette, _: 4,4;
+    // the lower byte is CGB only
+    from into u8, bits, set_bits: 7,0;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -140,7 +143,7 @@ impl OAM {
             y_position: 0x00,
             x_position: 0x00,
             tile_number: 0x00,
-            attributes: Attributes::empty(),
+            attributes: Attributes(0x00),
         }
     }
 }
@@ -276,21 +279,23 @@ impl LCD {
     }
 
     pub fn read_oam(&self, addr: u16) -> u8 {
+        let oam_addr = (addr / 4) as usize;
         match addr % 4 {
-            0x0 => self.vram_oam[addr as usize / 4].y_position,
-            0x1 => self.vram_oam[addr as usize / 4].x_position,
-            0x2 => self.vram_oam[addr as usize / 4].tile_number,
-            0x3 => self.vram_oam[addr as usize / 4].attributes.bits() as u8,
+            0x0 => self.vram_oam[oam_addr].y_position,
+            0x1 => self.vram_oam[oam_addr].x_position,
+            0x2 => self.vram_oam[oam_addr].tile_number,
+            0x3 => self.vram_oam[oam_addr].attributes.bits() as u8,
             _ => unreachable!(),
         }
     }
 
     pub fn write_oam(&mut self, addr: u16, value: u8) {
+        let oam_addr = (addr / 4) as usize;
         match addr % 4 {
-            0x0 => self.vram_oam[addr as usize / 4].y_position = value,
-            0x1 => self.vram_oam[addr as usize / 4].x_position = value,
-            0x2 => self.vram_oam[addr as usize / 4].tile_number = value,
-            0x3 => self.vram_oam[addr as usize / 4].attributes = Attributes::from_bits_truncate(value),
+            0x0 => self.vram_oam[oam_addr].y_position = value,
+            0x1 => self.vram_oam[oam_addr].x_position = value,
+            0x2 => self.vram_oam[oam_addr].tile_number = value,
+            0x3 => self.vram_oam[oam_addr].attributes.set_bits(value),
             _ => unreachable!(),
         }
     }
@@ -344,7 +349,7 @@ impl LCD {
         // if mode changed, and interrupts for the new mode are enabled, set LCDC interrupt
         if prev_mode != self.status.mode_flag() {
             match self.status.mode_flag() {
-                Mode::HBlank => if self.status.hblank_interrupt() { self.lcdc_interrupt(ih) },
+                Mode::HBlank => self.hblank(ih),
                 Mode::VBlank => self.vblank(ih),
                 Mode::OAMSearch => if self.status.oam_interrupt() { self.lcdc_interrupt(ih) },
                 Mode::Transfer => (),
@@ -360,11 +365,18 @@ impl LCD {
         }
     }
 
-    fn vblank(&self, ih: &mut InterruptHandler) {
+    fn hblank(&self, ih: &mut InterruptHandler) {
+        if self.status.hblank_interrupt() {
+            self.lcdc_interrupt(ih)
+        }
+    }
+
+    fn vblank(&mut self, ih: &mut InterruptHandler) {
         if self.status.vblank_interrupt() {
             self.lcdc_interrupt(ih);
         }
         self.save_frame();
+        self.frame = [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4];
     }
 
     fn lcdc_interrupt(&self, ih: &mut InterruptHandler) {
@@ -449,8 +461,61 @@ impl LCD {
         }
     }
 
-    fn draw_sprites(&self) {
+    fn draw_sprites(&mut self) {
+        // set sprite height from control register
+        let y_size = match self.control.sprite_size() {
+            SpriteSizes::Size8x8 => 8,
+            SpriteSizes::Size8x16 => 16,
+        };
 
+        for sprite in self.vram_oam.iter() {
+            let y_pos: i16 = sprite.y_position as i16 - 16;
+            // skip over this sprite if the current LCD line doesn't intersect it
+            if !(y_pos..(y_pos + y_size as i16)).contains(&(self.lcd_y as i16)) {
+                continue;
+            }
+
+            // calculate the line within the sprite that the current LCD line intersects
+            let sprite_line = if sprite.attributes.y_flip() {
+                self.lcd_y - y_pos as u8
+            } else {
+                y_size - (self.lcd_y - y_pos as u8)
+            };
+
+            let sprite_data_start = ((sprite.tile_number as u16 * 16) + (sprite_line as u16 * 2)) as usize;
+            let sprite_data_end = sprite_data_start + 1;
+            let pixel_data = &self.vram_tile_data[sprite_data_start..=sprite_data_end];
+
+            for sprite_column in 0..8 {
+                let pixel_bit = if sprite.attributes.x_flip() {
+                    sprite_column
+                } else {
+                    7 - sprite_column
+                };
+
+                let colour_id = (((pixel_data[1] >> pixel_bit) & 0b1) << 1) |
+                    ((pixel_data[0] >> pixel_bit) & 0b1);
+                let palette = match sprite.attributes.palette() {
+                    0 => &self.sprite_palette_0,
+                    1 => &self.sprite_palette_1,
+                    _ => unreachable!(), // 1 bit field
+                };
+                let shade = palette.colour(colour_id as usize);
+
+                let pixel = match shade {
+                    Shade::White => continue, // white is transparent for sprites
+                    Shade::LightGray => [0xCC, 0xCC, 0xCC, 0xFF],
+                    Shade::DarkGray => [0x77, 0x77, 0x77, 0xFF],
+                    Shade::Black => [0x00, 0x00, 0x00, 0xFF],
+                };
+
+                let pixel_x = sprite.x_position - 8 + sprite_column;
+                let frame_pixel_start = (self.lcd_y as usize * LCD::SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
+                let frame_pixel_end = frame_pixel_start + 4;
+                let pixel_slice = &mut self.frame[frame_pixel_start..frame_pixel_end];
+                pixel_slice.clone_from_slice(&pixel[..4]);
+            }
+        }
     }
 
     fn save_frame(&self) {

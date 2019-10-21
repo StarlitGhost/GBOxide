@@ -5,7 +5,7 @@
     "tasks": [
         {
             "type": "shell",
-            "taskName": "cargo build",
+            "label": "cargo build",
             "command": "cargo",
             "args": [
                 "build"
