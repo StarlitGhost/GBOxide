@@ -4,6 +4,7 @@ pub mod mmu;
 pub mod interrupt;
 pub mod timer;
 pub mod lcd;
+pub mod sound;
 
 use std::error::Error;
 

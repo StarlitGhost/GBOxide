@@ -2,6 +2,7 @@ use cartridge::Cartridge;
 use gameboy::interrupt::InterruptHandler;
 use gameboy::timer::Timer;
 use gameboy::lcd::LCD;
+use gameboy::sound::Sound;
 
 //TODO: all basic stubs in here, should be rom/ram banks, vram, etc
 
@@ -19,6 +20,8 @@ pub struct MMU {
     timer: Timer,
 
     lcd: LCD,
+
+    sound: Sound,
 }
 
 impl MMU {
@@ -37,6 +40,8 @@ impl MMU {
             timer: Timer::new(),
 
             lcd: LCD::new(),
+
+            sound: Sound::new(),
         }
     }
 
@@ -69,9 +74,9 @@ impl MMU {
             0xFF04 ..= 0xFF07 => self.timer.read_register(addr),
             0xFF08 ..= 0xFF0E => 0xFF, // unusable
             0xFF0F => self.interrupt.get_flag(),
-            0xFF10 ..= 0xFF26 => 0xFF, // 'NR' sound registers
+            0xFF10 ..= 0xFF26 => self.sound.read_register(addr), // 'NR' sound registers
             0xFF27 ..= 0xFF2F => 0xFF, // unusable
-            0xFF30 ..= 0xFF3F => 0xFF, // wave pattern RAM
+            0xFF30 ..= 0xFF3F => self.sound.wave_ram[(addr - 0xFF30) as usize], // wave pattern RAM
             0xFF40 ..= 0xFF4B => self.lcd.read_register(addr), // LCD control registers
             0xFF4C ..= 0xFF4F => 0xFF, // unusable
             0xFF50 => 0xFF, // boot rom disable (unreadable - I think that just means 0xFF)
@@ -99,9 +104,9 @@ impl MMU {
             0xFF04 ..= 0xFF07 => self.timer.write_register(addr, value),
             0xFF08 ..= 0xFF0E => (), // unusable
             0xFF0F => self.interrupt.set_flag(value),
-            0xFF10 ..= 0xFF26 => (), // 'NR' sound registers
+            0xFF10 ..= 0xFF26 => self.sound.write_register(addr, value), // 'NR' sound registers
             0xFF27 ..= 0xFF2F => (), // unusable
-            0xFF30 ..= 0xFF3F => (), // wave pattern RAM
+            0xFF30 ..= 0xFF3F => self.sound.wave_ram[(addr - 0xFF30) as usize] = value, // wave pattern RAM
             0xFF40 ..= 0xFF45 => self.lcd.write_register(addr, value), // GPU control registers
             0xFF46 => self.dma_transfer(value), // DMA transfer to OAM
             0xFF47 ..= 0xFF4B => self.lcd.write_register(addr, value), // GPU control registers
