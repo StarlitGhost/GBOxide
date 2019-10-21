@@ -7,12 +7,21 @@
         {
             "type": "gdb",
             "request": "launch",
-            "name": "Launch Program",
+            "name": "Debug - GDB",
             "target": "./target/debug/gboxide",
             "arguments": "./roms/tetris.gb",
             "env": {"RUST_BACKTRACE": "1"},
             "cwd": "${workspaceRoot}",
             "valuesFormatting": "parseText"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug - CodeLLDB",
+            "program": "${workspaceFolder}/target/debug/gboxide",
+            "args": ["./roms/tetris.gb"],
+            "env": {"RUST_BACKTRACE": "1"},
+            "cwd": "${workspaceRoot}"
         }
     ]
 }
