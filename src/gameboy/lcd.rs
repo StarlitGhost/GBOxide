@@ -215,6 +215,7 @@ pub struct LCD {
     window_x: u8,
 
     frame: [u8; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4],
+    last_frame_hash: u64,
 }
 
 impl LCD {
@@ -250,6 +251,7 @@ impl LCD {
             window_x: 0x00,
 
             frame: [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4],
+            last_frame_hash: 0,
         }
     }
 
@@ -386,9 +388,17 @@ impl LCD {
         if self.status.vblank_interrupt() {
             self.lcdc_interrupt(ih);
         }
-        self.save_frame();
-        self.frame = [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4];
-        self.save_tile_data();
+        use std::hash::{Hash, Hasher};
+        use std::collections::hash_map::DefaultHasher;
+        let mut hasher = DefaultHasher::new();
+        self.frame.hash(&mut hasher);
+        let frame_hash = hasher.finish();
+        if frame_hash != self.last_frame_hash {
+            self.last_frame_hash = frame_hash;
+            self.save_frame();
+            self.frame = [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4];
+            self.save_tile_data();
+        }
     }
 
     fn lcdc_interrupt(&self, ih: &mut InterruptHandler) {
