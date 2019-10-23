@@ -282,7 +282,7 @@ dependencies = [
  "libc 0.2.62 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "smallvec 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smallvec 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -363,7 +363,7 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "0.6.0"
+version = "0.6.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -429,7 +429,7 @@ dependencies = [
  "half 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "shared_library 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "smallvec 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smallvec 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "vk-sys 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -502,7 +502,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 "checksum shared_library 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "8254bf098ce4d8d7cc7cc6de438c5488adc5297e5b7ffef88816c0a91bd289c1"
-"checksum smallvec 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "44db0ecb22921ef790d17ae13a3f6d15784183ff5f2a01aa32098c7498d2b4b9"
+"checksum smallvec 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)" = "ab606a9c5e214920bb66c458cd7be8ef094f813f20fe77a54cc7dbfff220d4b7"
 "checksum strsim 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
 "checksum syn 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "66850e97125af79138385e9b88339cbcd037e3f28ceab8c5ad98e64f0f1f80bf"
 "checksum termion 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "689a3bdfaab439fd92bc87df5c4c78417d3cbe537487274e9b0b2dce76e92096"
