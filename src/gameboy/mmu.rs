@@ -14,8 +14,8 @@ pub struct MMU {
 
     pub interrupt: InterruptHandler,
 
-    cycles: u32,
-    prev_cycles: u32,
+    cycles: u128,
+    prev_cycles: u128,
     timer: Timer,
 
     lcd: LCD,
@@ -38,10 +38,6 @@ impl MMU {
 
             lcd: LCD::new(),
         }
-    }
-
-    pub fn get_cycles(&self) -> u32 {
-        self.cycles
     }
 
     pub fn get_cycle_diff(&mut self) -> u8 {
@@ -135,7 +131,7 @@ impl MMU {
     }
 
     fn add_machine_cycles(&mut self, machine_cycles: u8) {
-        self.cycles += (machine_cycles as u32) * 4;
+        self.cycles += (machine_cycles as u128) * 4;
     }
 
     fn step(&mut self) {
