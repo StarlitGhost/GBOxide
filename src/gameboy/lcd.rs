@@ -1,4 +1,4 @@
-use gameboy::interrupt::{InterruptHandler, Interrupt};
+use gameboy::interrupt::{Interrupt, InterruptHandler};
 
 #[derive(Clone, Copy, Debug)]
 pub enum TileDataAddressRange {
@@ -194,7 +194,7 @@ impl Shade {
 
 pub struct LCD {
     pub vram_tile_data: [u8; 0x1800], //0x8000-0x97FF
-    pub vram_bg_maps: [u8; 0x0800],    //0x9800-0x9FFF
+    pub vram_bg_maps: [u8; 0x0800],   //0x9800-0x9FFF
     pub vram_oam: [OAM; 40],          //0xFE00-0xFE9F
 
     control: Control,
@@ -279,7 +279,7 @@ impl LCD {
             0xFF41 => self.status.set_bits(value),
             0xFF42 => self.scroll_y = value,
             0xFF43 => self.scroll_x = value,
-            0xFF44 => self.lcd_y = 0x00, // writing resets this counter
+            0xFF44 => self.lcd_y = 0x00, // writing resets this counter TODO: no it doesn't
             0xFF45 => self.lcd_y_compare = value,
             // 0xFF46 => (), // DMA Transfer - done in the mmu
             0xFF47 => self.bg_palette.set_bits(value), // BG/Window palette
@@ -316,10 +316,14 @@ impl LCD {
     pub fn step(&mut self, ih: &mut InterruptHandler) {
         self.set_status(ih);
 
-        if !self.control.enable() { return }
+        if !self.control.enable() {
+            return;
+        }
 
         self.scanline_cycle_count -= 4;
-        if self.scanline_cycle_count > 0 { return }
+        if self.scanline_cycle_count > 0 {
+            return;
+        }
 
         self.scanline_cycle_count = LCD::SCANLINE_CYCLE_TOTAL;
         match self.lcd_y {
@@ -364,7 +368,7 @@ impl LCD {
             match self.status.mode_flag() {
                 Mode::HBlank => self.hblank(ih),
                 Mode::VBlank => self.vblank(ih),
-                Mode::OAMSearch => if self.status.oam_interrupt() { self.lcdc_interrupt(ih) },
+                Mode::OAMSearch => self.oam_search(ih),
                 Mode::Transfer => (),
             }
         }
@@ -372,7 +376,9 @@ impl LCD {
         // flag and interrupt when we're on the game-specified scanline lcd_y_compare
         if self.lcd_y == self.lcd_y_compare {
             self.status.set_coincidence_flag(true);
-            if self.status.ly_coincidence_interrupt() { self.lcdc_interrupt(ih) }
+            if self.status.ly_coincidence_interrupt() {
+                self.lcdc_interrupt(ih)
+            }
         } else {
             self.status.set_coincidence_flag(false);
         }
@@ -398,6 +404,12 @@ impl LCD {
             self.save_frame();
             self.frame = [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4];
             self.save_tile_data();
+        }
+    }
+
+    fn oam_search(&self, ih: &mut InterruptHandler) {
+        if self.status.oam_interrupt() {
+            self.lcdc_interrupt(ih);
         }
     }
 
@@ -455,22 +467,25 @@ impl LCD {
 
             let tile_id = match self.control.tile_data() {
                 TileDataAddr8000_8FFF => self.vram_bg_maps[tile_map_addr as usize] as u16,
-                TileDataAddr8800_97FF => (self.vram_bg_maps[tile_map_addr as usize] as i8 as i16 + 128) as u16,
+                TileDataAddr8800_97FF => {
+                    (self.vram_bg_maps[tile_map_addr as usize] as i8 as i16 + 128) as u16
+                }
             };
 
             let tile_data_addr = tile_data_offset + (tile_id * 16);
             let tile_row_offset = ((map_y % 8) * 2) as u16;
 
             let pixel_start = (tile_data_addr + tile_row_offset) as usize;
-            let pixel_end = pixel_start + 1;
-            let pixel_data = &self.vram_tile_data[pixel_start..=pixel_end];
-            
+            let pixel_end = pixel_start + 2;
+            let pixel_data = &self.vram_tile_data[pixel_start..pixel_end];
+
             let pixel_bit = 7 - (map_x % 8);
 
             let shade = self.get_shade(pixel_data, pixel_bit, &self.bg_palette);
             let pixel = shade.into_pixel();
 
-            let frame_pixel_start = (self.lcd_y as usize * LCD::SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
+            let frame_pixel_start =
+                (self.lcd_y as usize * LCD::SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
             let frame_pixel_end = frame_pixel_start + 4;
             let pixel_slice = &mut self.frame[frame_pixel_start..frame_pixel_end];
             pixel_slice.clone_from_slice(&pixel[..4]);
@@ -485,7 +500,7 @@ impl LCD {
         };
 
         for sprite in self.vram_oam.iter() {
-            let y_pos: i16 = sprite.y_position as i16 - 16;
+            let y_pos = sprite.y_position as i16 - 16;
             // skip over this sprite if the current LCD line doesn't intersect it
             if !(y_pos..(y_pos + y_size as i16)).contains(&(self.lcd_y as i16)) {
                 continue;
@@ -498,9 +513,10 @@ impl LCD {
                 y_size - (self.lcd_y - y_pos as u8)
             };
 
-            let sprite_data_start = ((sprite.tile_number as u16 * 16) + (sprite_line as u16 * 2)) as usize;
-            let sprite_data_end = sprite_data_start + 1;
-            let pixel_data = &self.vram_tile_data[sprite_data_start..=sprite_data_end];
+            let sprite_data_start =
+                ((sprite.tile_number as u16 * 16) + (sprite_line as u16 * 2)) as usize;
+            let sprite_data_end = sprite_data_start + 2;
+            let pixel_data = &self.vram_tile_data[sprite_data_start..sprite_data_end];
 
             for sprite_column in 0..8 {
                 let pixel_bit = if sprite.attributes.x_flip() {
@@ -514,14 +530,19 @@ impl LCD {
                     1 => &self.sprite_palette_1,
                     _ => unreachable!(), // 1 bit field
                 };
-                let shade = self.get_shade(pixel_data, pixel_bit, palette);
-                let pixel = match shade {
-                    Shade::White => continue, // white is transparent for sprites
-                    _ => shade.into_pixel(),
-                };
+
+                let palette_index = self.get_palette_index(pixel_data, pixel_bit);
+                // palette index 0 is transparent for sprites
+                if palette_index == 0 {
+                    continue;
+                }
+
+                let shade = palette.colour(palette_index);
+                let pixel = shade.into_pixel();
 
                 let pixel_x = sprite.x_position - 8 + sprite_column;
-                let frame_pixel_start = (self.lcd_y as usize * LCD::SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
+                let frame_pixel_start =
+                    (self.lcd_y as usize * LCD::SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
                 let frame_pixel_end = frame_pixel_start + 4;
                 let pixel_slice = &mut self.frame[frame_pixel_start..frame_pixel_end];
                 pixel_slice.clone_from_slice(&pixel[..4]);
@@ -529,21 +550,27 @@ impl LCD {
         }
     }
 
+    fn get_palette_index(&self, pixel_data: &[u8], pixel_bit: u8) -> usize {
+        let top_bit = (pixel_data[1] >> pixel_bit) & 0b1;
+        let bot_bit = (pixel_data[0] >> pixel_bit) & 0b1;
+        ((top_bit << 1) | bot_bit) as usize
+    }
+
     fn get_shade(&self, pixel_data: &[u8], pixel_bit: u8, palette: &Palette) -> Shade {
-        let colour_id = (((pixel_data[1] >> pixel_bit) & 0b1) << 1) |
-            ((pixel_data[0] >> pixel_bit) & 0b1);
-        palette.colour(colour_id as usize)
+        let palette_index = self.get_palette_index(pixel_data, pixel_bit);
+        palette.colour(palette_index)
     }
 
     fn save_frame(&self) {
-        use std::path::Path;
         use std::fs::File;
         use std::io::BufWriter;
+        use std::path::Path;
         let path = Path::new(r"./frame.png");
         let file = File::create(path).unwrap();
         let ref mut w = BufWriter::new(file);
 
-        let mut png_encoder = png::Encoder::new(w, LCD::SCREEN_WIDTH as u32, LCD::SCREEN_HEIGHT as u32);
+        let mut png_encoder =
+            png::Encoder::new(w, LCD::SCREEN_WIDTH as u32, LCD::SCREEN_HEIGHT as u32);
         png_encoder.set_color(png::ColorType::RGBA);
         png_encoder.set_depth(png::BitDepth::Eight);
         let mut writer = png_encoder.write_header().unwrap();
@@ -551,9 +578,9 @@ impl LCD {
     }
 
     fn save_tile_data(&self) {
-        use std::path::Path;
         use std::fs::File;
         use std::io::BufWriter;
+        use std::path::Path;
         let path = Path::new(r"./tiledata.png");
         let file = File::create(path).unwrap();
         let ref mut w = BufWriter::new(file);
@@ -571,9 +598,9 @@ impl LCD {
                 let tile_data_offset = tile_id * 16;
 
                 let pixel_start = (tile_data_offset + tile_row_offset) as usize;
-                let pixel_end = pixel_start + 1;
-                let pixel_data = &self.vram_tile_data[pixel_start..=pixel_end];
-                
+                let pixel_end = pixel_start + 2;
+                let pixel_data = &self.vram_tile_data[pixel_start..pixel_end];
+
                 let pixel_bit = 7 - (col % 8);
 
                 let shade = self.get_shade(pixel_data, pixel_bit as u8, &self.bg_palette);
@@ -585,7 +612,7 @@ impl LCD {
                 pixel_slice.clone_from_slice(&pixel[..4]);
             }
         }
-        
+
         writer.write_image_data(&tile_pixels).unwrap();
     }
 }
