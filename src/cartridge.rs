@@ -7,30 +7,60 @@ use std::io::Cursor;
 use std::num::Wrapping;
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use num_traits::FromPrimitive;
 
 #[allow(non_camel_case_types)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromPrimitive)]
 pub enum CartridgeType {
     ROM  = 0x00, ROM_RAM  = 0x08, ROM_RAM_BATTERY  = 0x09,
     MBC1 = 0x01, MBC1_RAM = 0x02, MBC1_RAM_BATTERY = 0x03,
-    MBC2 = 0x05,                  MBC2_RAM_BATTERY = 0x06,
+    MBC2 = 0x05,                  MBC2_BATTERY     = 0x06,
+    MMM01 = 0x0B, MMM01_RAM = 0x0C, MMM01_RAM_BATTERY = 0x0D,
     MBC3 = 0x11, MBC3_RAM = 0x12, MBC3_RAM_BATTERY = 0x13,
+    MBC3_TIMER_BATTERY = 0x0F,
+    MBC3_TIMER_RAM_BATTERY = 0x10,
+    MBC5 = 0x19, MBC5_RAM = 0x1A, MBC5_RAM_BATTERY = 0x1B,
+    MBC5_RUMBLE = 0x1C, MBC5_RUMBLE_RAM = 0x1D,
+    MBC5_RUMBLE_RAM_BATTERY = 0x1E,
+    MBC6 = 0x20,
+    MBC7_SENSOR_RUMBLE_RAM_BATTERY = 0x22,
+    POCKET_CAMERA = 0xFC,
+    BANDAI_TAMA5 = 0xFD,
+    HuC3 = 0xFE,
+    HuC1_RAM_BATTERY = 0xFF,
 }
 impl fmt::Display for CartridgeType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::CartridgeType::*;
         write!(f, "{}", match *self {
-            ROM => "ROM ONLY",
-            ROM_RAM => "ROM+RAM",
-            ROM_RAM_BATTERY => "ROM+RAM+BATTERY",
+            ROM => "ROM Only",
+            ROM_RAM => "ROM + RAM",
+            ROM_RAM_BATTERY => "ROM + RAM + Battery",
             MBC1 => "MBC1",
-            MBC1_RAM => "MBC1+RAM",
-            MBC1_RAM_BATTERY => "MBC1+RAM+BATTERY",
+            MBC1_RAM => "MBC1 + RAM",
+            MBC1_RAM_BATTERY => "MBC1 + RAM + Battery",
             MBC2 => "MBC2",
-            MBC2_RAM_BATTERY => "MBC2+RAM+BATTERY",
+            MBC2_BATTERY => "MBC2 + Battery",
+            MMM01 => "MMM01",
+            MMM01_RAM => "MMM01 + RAM",
+            MMM01_RAM_BATTERY => "MMM01 + RAM + Battery",
             MBC3 => "MBC3",
-            MBC3_RAM => "MBC3+RAM",
-            MBC3_RAM_BATTERY => "MBC3+RAM+BATTERY",
+            MBC3_RAM => "MBC3 + RAM",
+            MBC3_RAM_BATTERY => "MBC3 + RAM + Battery",
+            MBC3_TIMER_BATTERY => "MBC3 + Timer + Battery",
+            MBC3_TIMER_RAM_BATTERY => "MBC3 + Timer + RAM + Battery",
+            MBC5 => "MBC5",
+            MBC5_RAM => "MBC5 + RAM",
+            MBC5_RAM_BATTERY => "MBC5 + RAM + Battery",
+            MBC5_RUMBLE => "MBC5 + Rumble",
+            MBC5_RUMBLE_RAM => "MBC5 + Rumble + RAM",
+            MBC5_RUMBLE_RAM_BATTERY => "MBC5 + Rumble + RAM + Battery",
+            MBC6 => "MBC6",
+            MBC7_SENSOR_RUMBLE_RAM_BATTERY => "MBC7 + Sensor + Rumble + RAM + Battery",
+            POCKET_CAMERA => "Pocket Camera",
+            BANDAI_TAMA5 => "Bandai TAMA5",
+            HuC3 => "Hudson HuC-3",
+            HuC1_RAM_BATTERY => "Hudson HuC-1 + RAM + Battery",
         })
     }
 }
@@ -311,20 +341,9 @@ impl Header {
             false => Header::lookup_old_licensee_code(&raw_old_licensee_code)?.to_string(),
         };
 
-        use self::CartridgeType::*;
-        let cartridge_type = match raw_cartridge_type {
-            0x00 => ROM,
-            0x01 => MBC1,
-            0x02 => MBC1_RAM,
-            0x03 => MBC1_RAM_BATTERY,
-            0x05 => MBC2,
-            0x06 => MBC2_RAM_BATTERY,
-            0x08 => ROM_RAM,
-            0x09 => ROM_RAM_BATTERY,
-            0x11 => MBC3,
-            0x12 => MBC3_RAM,
-            0x13 => MBC3_RAM_BATTERY,
-            _ => return Err(format!("unknown cartridge_type {:#04x}", raw_cartridge_type).into()),
+        let cartridge_type: CartridgeType = match FromPrimitive::from_u8(raw_cartridge_type) {
+            Some(cart_type) => cart_type,
+            None => return Err(format!("unknown cartridge_type {:#04x}", raw_cartridge_type).into()),
         };
 
         let rom_size: u32 = (32 << (raw_rom_size & 0xf)) * 1024;

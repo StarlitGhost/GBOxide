@@ -1,18 +1,15 @@
+use num_traits::FromPrimitive;
+
 use gameboy::interrupt::{Interrupt, InterruptHandler};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromPrimitive)]
 pub enum TileDataAddressRange {
     TileDataAddr8800_97FF = 0,
     TileDataAddr8000_8FFF = 1,
 }
 impl From<u8> for TileDataAddressRange {
     fn from(value: u8) -> TileDataAddressRange {
-        use gameboy::lcd::TileDataAddressRange::*;
-        match value {
-            0b1 => TileDataAddr8000_8FFF,
-            0b0 => TileDataAddr8800_97FF,
-            _ => unreachable!(), // 1 bit field
-        }
+        FromPrimitive::from_u8(value).expect("invalid tile data address bit")
     }
 }
 impl From<TileDataAddressRange> for u8 {
@@ -21,19 +18,14 @@ impl From<TileDataAddressRange> for u8 {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromPrimitive)]
 pub enum TileMapAddressRange {
     TileMapAddr9800_9BFF = 0,
     TileMapAddr9C00_9FFF = 1,
 }
 impl From<u8> for TileMapAddressRange {
     fn from(value: u8) -> TileMapAddressRange {
-        use gameboy::lcd::TileMapAddressRange::*;
-        match value {
-            0b0 => TileMapAddr9800_9BFF,
-            0b1 => TileMapAddr9C00_9FFF,
-            _ => unreachable!(), // 1 bit field
-        }
+        FromPrimitive::from_u8(value).expect("invalid tile map address bit")
     }
 }
 impl From<TileMapAddressRange> for u8 {
@@ -42,19 +34,14 @@ impl From<TileMapAddressRange> for u8 {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromPrimitive)]
 pub enum SpriteSizes {
     Size8x8 = 0,
     Size8x16 = 1,
 }
 impl From<u8> for SpriteSizes {
     fn from(value: u8) -> SpriteSizes {
-        use gameboy::lcd::SpriteSizes::*;
-        match value {
-            0b0 => Size8x8,
-            0b1 => Size8x16,
-            _ => unreachable!(), // 1 bit field
-        }
+        FromPrimitive::from_u8(value).expect("invalid sprite size bit")
     }
 }
 impl From<SpriteSizes> for u8 {
@@ -78,7 +65,7 @@ bitfield!{
     from into u8, bits, set_bits: 7,0;
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, FromPrimitive)]
 enum Mode {
     HBlank = 0b00,
     VBlank = 0b01,
@@ -87,14 +74,7 @@ enum Mode {
 }
 impl From<u8> for Mode {
     fn from(value: u8) -> Mode {
-        use gameboy::lcd::Mode::*;
-        match value {
-            0b00 => HBlank,
-            0b01 => VBlank,
-            0b10 => OAMSearch,
-            0b11 => Transfer,
-            _ => unreachable!(), // 2 bit field
-        }
+        FromPrimitive::from_u8(value).expect("invalid mode")
     }
 }
 impl From<Mode> for u8 {
@@ -156,7 +136,7 @@ bitfield!{
     from into u8, bits, set_bits: 7,0;
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromPrimitive)]
 enum Shade {
     White = 0b00,
     LightGray = 0b01,
@@ -165,14 +145,7 @@ enum Shade {
 }
 impl From<u8> for Shade {
     fn from(value: u8) -> Shade {
-        use gameboy::lcd::Shade::*;
-        match value {
-            0b00 => White,
-            0b01 => LightGray,
-            0b10 => DarkGray,
-            0b11 => Black,
-            _ => unreachable!(), // 2 bit field
-        }
+        FromPrimitive::from_u8(value).expect("invalid shade")
     }
 }
 impl From<Shade> for u8 {

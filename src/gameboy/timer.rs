@@ -1,6 +1,8 @@
+use num_traits::FromPrimitive;
+
 use gameboy::interrupt::{InterruptHandler, Interrupt};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromPrimitive)]
 pub enum Clock {
     Clk4096Hz = 0,
     Clk262144Hz = 1,
@@ -18,16 +20,10 @@ impl Clock {
             Clk16384Hz => 256,
         }
     }
-
-    fn from_u8(value: u8) -> Clock {
-        use self::Clock::*;
-        match value {
-            0 => Clk4096Hz,
-            1 => Clk262144Hz,
-            2 => Clk65536Hz,
-            3 => Clk16384Hz,
-            _ => panic!("Invalid clock selection {}", value),
-        }
+}
+impl From<u8> for Clock {
+    fn from(value: u8) -> Clock {
+        FromPrimitive::from_u8(value).unwrap_or_else(|| panic!("Invalid clock selection {}", value))
     }
 }
 
@@ -102,7 +98,7 @@ impl Timer {
 
     fn set_control(&mut self, value: u8) {
         self.enabled = (value >> 2) & 0x1 == 1;
-        self.clock = Clock::from_u8(value & 0x3);
+        self.clock = Clock::from(value & 0x3);
     }
 
     pub fn step(&mut self, ih: &mut InterruptHandler) {
