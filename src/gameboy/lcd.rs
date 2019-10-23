@@ -394,6 +394,7 @@ impl LCD {
         if self.status.vblank_interrupt() {
             self.lcdc_interrupt(ih);
         }
+        
         use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
         let mut hasher = DefaultHasher::new();
@@ -401,9 +402,9 @@ impl LCD {
         let frame_hash = hasher.finish();
         if frame_hash != self.last_frame_hash {
             self.last_frame_hash = frame_hash;
-            self.save_frame();
+            let _ = self.save_frame();
             self.frame = [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4];
-            self.save_tile_data();
+            let _ = self.save_tile_data();
         }
     }
 
@@ -561,35 +562,25 @@ impl LCD {
         palette.colour(palette_index)
     }
 
-    fn save_frame(&self) {
+    fn save_frame(&self) -> Result<(), png::EncodingError> {
         use std::fs::File;
         use std::io::BufWriter;
         use std::path::Path;
         let path = Path::new(r"./frame.png");
-        let file = File::create(path).unwrap();
+        let file = File::create(path)?;
         let ref mut w = BufWriter::new(file);
 
         let mut png_encoder =
             png::Encoder::new(w, LCD::SCREEN_WIDTH as u32, LCD::SCREEN_HEIGHT as u32);
         png_encoder.set_color(png::ColorType::RGBA);
         png_encoder.set_depth(png::BitDepth::Eight);
-        let mut writer = png_encoder.write_header().unwrap();
-        writer.write_image_data(&self.frame).unwrap();
+        let mut writer = png_encoder.write_header()?;
+        writer.write_image_data(&self.frame)?;
+
+        Ok(())
     }
 
-    fn save_tile_data(&self) {
-        use std::fs::File;
-        use std::io::BufWriter;
-        use std::path::Path;
-        let path = Path::new(r"./tiledata.png");
-        let file = File::create(path).unwrap();
-        let ref mut w = BufWriter::new(file);
-
-        let mut png_encoder = png::Encoder::new(w, 256, 96);
-        png_encoder.set_color(png::ColorType::RGBA);
-        png_encoder.set_depth(png::BitDepth::Eight);
-        let mut writer = png_encoder.write_header().unwrap();
-
+    fn save_tile_data(&self) -> Result<(), png::EncodingError> {
         let mut tile_pixels = [0x00; 256 * 96 * 4];
         for line in 0..96 {
             let tile_row_offset = (line % 8) * 2;
@@ -612,7 +603,20 @@ impl LCD {
                 pixel_slice.clone_from_slice(&pixel[..4]);
             }
         }
+        
+        use std::path::Path;
+        use std::fs::File;
+        use std::io::BufWriter;
+        let path = Path::new(r"./tiledata.png");
+        let file = File::create(path)?;
+        let ref mut w = BufWriter::new(file);
 
-        writer.write_image_data(&tile_pixels).unwrap();
+        let mut png_encoder = png::Encoder::new(w, 256, 96);
+        png_encoder.set_color(png::ColorType::RGBA);
+        png_encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = png_encoder.write_header()?;
+        writer.write_image_data(&tile_pixels)?;
+
+        Ok(())
     }
 }
