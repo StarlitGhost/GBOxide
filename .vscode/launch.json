@@ -20,8 +20,12 @@
             "name": "Debug - CodeLLDB",
             "program": "${workspaceFolder}/target/debug/gboxide",
             "args": [
-                //"./roms/tetris.gb"
-                "./roms/dr_mario.gb"
+                //"./roms/test/cpu_instrs/cpu_instrs.gb"    // MBC1
+                "./roms/tetris.gb"      // ROM
+                //"./roms/dr_mario.gb"    // ROM
+                //"./roms/kirby_1.gb"     // MBC1 - freezes, no output
+                //"./roms/awakening.gb"   // MBC5 RAM BATTERY
+                //"./roms/pokemon_red.gb" // MBC3 RAM BATTERY
             ],
             "env": {"RUST_BACKTRACE": "1"},
             "cwd": "${workspaceRoot}"
