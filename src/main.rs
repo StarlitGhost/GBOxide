@@ -18,6 +18,11 @@ fn main() {
         process::exit(1);
     });
 
+    if let Err(e) = gboxide::gui::run() {
+        eprintln!("Failed to create a window: {}", e);
+
+        process::exit(1);
+    }
     if let Err(e) = gboxide::gameboy::run(cartridge) {
         eprintln!("Game error: {}", e);
 
