@@ -6,6 +6,7 @@ extern crate clap;
 use std::process;
 
 use gboxide::cartridge::Cartridge;
+use gboxide::gameboy::GameBoy;
 
 //#[cfg(feature = "yaml")]
 fn main() {
@@ -18,12 +19,9 @@ fn main() {
         process::exit(1);
     });
 
-    if let Err(e) = gboxide::gui::run() {
-        eprintln!("Failed to create a window: {}", e);
+    let mut gameboy = GameBoy::new(cartridge);
 
-        process::exit(1);
-    }
-    if let Err(e) = gboxide::gameboy::run(cartridge) {
+    if let Err(e) = gameboy.run_forever() {
         eprintln!("Game error: {}", e);
 
         process::exit(1);

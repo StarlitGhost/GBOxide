@@ -18,7 +18,7 @@ pub struct MMU {
     prev_cycles: u128,
     timer: Timer,
 
-    lcd: LCD,
+    pub lcd: LCD,
 }
 
 impl MMU {

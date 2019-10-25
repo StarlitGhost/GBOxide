@@ -10,14 +10,31 @@ use std::error::Error;
 use ::cartridge::Cartridge;
 use ::gameboy;
 
-pub fn run(cartridge: Cartridge) -> Result<(), Box<dyn Error>> {
-    println!("{:#?}", cartridge.header);
-    println!("read_rom_size: {}", cartridge.rom_len());
+pub struct GameBoy {
+    cpu: gameboy::cpu::CPU,
+    mmu: gameboy::mmu::MMU,
+}
 
-    let mut cpu = gameboy::cpu::CPU::new();
-    let mut mmu = gameboy::mmu::MMU::new(cartridge);
+impl GameBoy {
+    pub fn new(cartridge: Cartridge) -> GameBoy {
+        println!("{:#?}", cartridge.header);
+        println!("read_rom_size: {}", cartridge.rom_len());
 
-    cpu.execute(&mut mmu)?;
+        let cpu = gameboy::cpu::CPU::new();
+        let mmu = gameboy::mmu::MMU::new(cartridge);
 
-    Ok(())
+        GameBoy { cpu, mmu }
+    }
+
+    pub fn run_to_vblank(&mut self) -> Result<(), Box<dyn Error>> {
+        self.cpu.run_to_vblank(&mut self.mmu)?;
+
+        Ok(())
+    }
+
+    pub fn run_forever(&mut self) -> Result<(), Box<dyn Error>> {
+        self.cpu.run_forever(&mut self.mmu)?;
+
+        Ok(())
+    }
 }

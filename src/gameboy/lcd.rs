@@ -189,6 +189,8 @@ pub struct LCD {
 
     frame: [u8; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4],
     last_frame_hash: u64,
+
+    vblank_set: bool,
 }
 
 impl LCD {
@@ -225,6 +227,8 @@ impl LCD {
 
             frame: [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4],
             last_frame_hash: 0,
+
+            vblank_set: false,
         }
     }
 
@@ -313,6 +317,19 @@ impl LCD {
         self.lcd_y += 1;
     }
 
+    pub fn vblank_reached(&mut self) -> bool {
+        if self.vblank_set {
+            self.vblank_set = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get_frame(&self) -> &[u8] {
+        &self.frame
+    }
+
     fn set_status(&mut self, ih: &mut InterruptHandler) {
         // if the LCD is disabled, reset scanline cycles and y position, and force VBlank mode
         if !self.control.enable() {
@@ -367,6 +384,8 @@ impl LCD {
         if self.status.vblank_interrupt() {
             self.lcdc_interrupt(ih);
         }
+
+        self.vblank_set = true;
         
         use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
