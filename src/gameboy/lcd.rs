@@ -502,9 +502,9 @@ impl LCD {
 
             // calculate the line within the sprite that the current LCD line intersects
             let sprite_line = if sprite.attributes.y_flip() {
-                self.lcd_y - y_pos as u8
-            } else {
                 y_size - (self.lcd_y - y_pos as u8)
+            } else {
+                self.lcd_y - y_pos as u8
             };
 
             let sprite_data_start =
