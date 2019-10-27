@@ -4,6 +4,7 @@ pub mod mmu;
 pub mod interrupt;
 pub mod timer;
 pub mod lcd;
+pub mod joypad;
 
 use std::error::Error;
 
@@ -24,6 +25,10 @@ impl GameBoy {
         let mmu = gameboy::mmu::MMU::new(cartridge);
 
         GameBoy { cpu, mmu }
+    }
+
+    pub fn set_controls(&mut self, controls: joypad::Controls) {
+        self.mmu.joypad.set_from_controls(controls, &mut self.mmu.interrupt);
     }
 
     pub fn draw_frame(&self, frame: &mut [u8]) {

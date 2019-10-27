@@ -1,6 +1,7 @@
 use crate::cartridge::Cartridge;
 use crate::gameboy::GameBoy;
 use crate::gameboy::lcd::{SCREEN_WIDTH, SCREEN_HEIGHT};
+use crate::gameboy::joypad::Controls;
 
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::event::{Event, VirtualKeyCode, WindowEvent};
@@ -10,7 +11,7 @@ use winit_input_helper::WinitInputHelper;
 pub fn run(cartridge: Cartridge) -> Result<(), Error> {
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
-    
+
     let (window, surface, width, height, mut hidpi_factor) = {
         let scale = 3.0;
         let width = SCREEN_WIDTH as f64 * scale;
@@ -40,8 +41,8 @@ pub fn run(cartridge: Cartridge) -> Result<(), Error> {
 
     event_loop.run(move |event, _, control_flow| {
         if let Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
+            event: WindowEvent::RedrawRequested,
+            ..
         } = event
         {
             gameboy.draw_frame(pixels.get_frame());
@@ -53,6 +54,19 @@ pub fn run(cartridge: Cartridge) -> Result<(), Error> {
                 *control_flow = ControlFlow::Exit;
                 return;
             }
+
+            let controls = Controls {
+                left: input.key_held(VirtualKeyCode::Left),
+                right: input.key_held(VirtualKeyCode::Right),
+                up: input.key_held(VirtualKeyCode::Up),
+                down: input.key_held(VirtualKeyCode::Down),
+
+                a: input.key_held(VirtualKeyCode::X),
+                b: input.key_held(VirtualKeyCode::Z),
+                start: input.key_held(VirtualKeyCode::Return),
+                select: input.key_held(VirtualKeyCode::Space),
+            };
+            gameboy.set_controls(controls);
 
             if let Some(factor) = input.hidpi_changed() {
                 hidpi_factor = factor;

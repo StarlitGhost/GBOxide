@@ -2,6 +2,7 @@ use crate::cartridge::Cartridge;
 use crate::gameboy::interrupt::InterruptHandler;
 use crate::gameboy::timer::Timer;
 use crate::gameboy::lcd::LCD;
+use crate::gameboy::joypad::Joypad;
 
 //TODO: all basic stubs in here, should be rom/ram banks, vram, etc
 
@@ -19,6 +20,8 @@ pub struct MMU {
     timer: Timer,
 
     pub lcd: LCD,
+
+    pub joypad: Joypad,
 }
 
 impl MMU {
@@ -37,6 +40,8 @@ impl MMU {
             timer: Timer::new(),
 
             lcd: LCD::new(),
+
+            joypad: Joypad::new(),
         }
     }
 
@@ -58,7 +63,7 @@ impl MMU {
             0xE000 ..= 0xFDFF => self.system_ram[(addr - 0xE000) as usize], // echo RAM
             0xFE00 ..= 0xFE9F => self.lcd.read_oam(addr - 0xFE00), // object attribute memory
             0xFEA0 ..= 0xFEFF => 0xFF, // unusable OAM region
-            0xFF00 => 0xFF, // joypad
+            0xFF00 => self.joypad.as_u8(), // joypad
             0xFF01 => 0xFF, // serial byte
             0xFF02 => 0xFF, // serial control
             0xFF03 => 0xFF, // unusable
@@ -88,7 +93,7 @@ impl MMU {
             0xE000 ..= 0xFDFF => self.system_ram[(addr - 0xE000) as usize] = value, // echo RAM
             0xFE00 ..= 0xFE9F => self.lcd.write_oam(addr - 0xFE00, value), // object attribute memory, writes to this region draw sprites
             0xFEA0 ..= 0xFEFF => (), // unusable OAM region
-            0xFF00 => (), // joypad
+            0xFF00 => self.joypad.write_select_bits(value), // joypad
             0xFF01 => self.serial = value, // serial data
             0xFF02 => { print!("{}", self.serial as char); }, // serial IO control
             0xFF03 => (), // unusable
