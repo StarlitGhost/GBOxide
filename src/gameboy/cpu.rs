@@ -2,16 +2,16 @@ use std::error::Error;
 
 use std::io::{stdin, Read};
 
-use gameboy::registers::{
+use crate::gameboy::registers::{
     Registers, Register8Bit, Register16Bit, Flags,
 };
-use gameboy::registers::Register8Bit::{
+use crate::gameboy::registers::Register8Bit::{
     A, B, C, D, E, H, L
 };
-use gameboy::registers::Register16Bit::{
+use crate::gameboy::registers::Register16Bit::{
     AF, BC, DE, HL, SP
 };
-use gameboy::mmu::MMU;
+use crate::gameboy::mmu::MMU;
 
 pub trait ReadU8 {
     fn read_u8(&self, cpu: &mut CPU, mmu: &mut MMU) -> u8;
@@ -45,7 +45,7 @@ impl ReadU16 for NextU16 {
 
 impl ReadU8 for Register8Bit {
     fn read_u8(&self, cpu: &mut CPU, _: &mut MMU) -> u8 {
-        use gameboy::registers::Register8Bit::*;
+        use Register8Bit::*;
         match *self {
             A => cpu.r.a,
             B => cpu.r.b,
@@ -60,7 +60,7 @@ impl ReadU8 for Register8Bit {
 
 impl WriteU8 for Register8Bit {
     fn write_u8(&self, cpu: &mut CPU, _: &mut MMU, value: u8) {
-        use gameboy::registers::Register8Bit::*;
+        use Register8Bit::*;
         match *self {
             A => cpu.r.a = value,
             B => cpu.r.b = value,
@@ -75,7 +75,7 @@ impl WriteU8 for Register8Bit {
 
 impl ReadU16 for Register16Bit {
     fn read_u16(&self, cpu: &mut CPU, _: &mut MMU) -> u16 {
-        use gameboy::registers::Register16Bit::*;
+        use Register16Bit::*;
         match *self {
             AF | BC | DE | HL => cpu.r.get_u16(*self),
             SP => cpu.r.sp,
@@ -85,7 +85,7 @@ impl ReadU16 for Register16Bit {
 
 impl WriteU16 for Register16Bit {
     fn write_u16(&self, cpu: &mut CPU, _: &mut MMU, value: u16) {
-        use gameboy::registers::Register16Bit::*;
+        use Register16Bit::*;
         match *self {
             AF | BC | DE | HL => cpu.r.set_u16(*self, value),
             SP => cpu.r.sp = value,
@@ -783,7 +783,7 @@ impl CPU {
         let interrupt_enabled_flagged = mmu.interrupt.get_enabled_flags();
         let interrupt = interrupt_enabled_flagged.trailing_zeros();
 
-        use gameboy::interrupt::Interrupt;
+        use crate::gameboy::interrupt::Interrupt;
         use num_traits::FromPrimitive;
         let address = match FromPrimitive::from_u32(interrupt) {
             Some(Interrupt::VBlank) => 0x0040,

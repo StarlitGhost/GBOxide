@@ -1,6 +1,9 @@
 use num_traits::FromPrimitive;
 
-use gameboy::interrupt::{Interrupt, InterruptHandler};
+use crate::gameboy::interrupt::{Interrupt, InterruptHandler};
+
+pub const SCREEN_WIDTH: u8 = 160;
+pub const SCREEN_HEIGHT: u8 = 144;
 
 #[derive(Clone, Copy, Debug, FromPrimitive)]
 pub enum TileDataAddressRange {
@@ -155,7 +158,7 @@ impl From<Shade> for u8 {
 }
 impl Shade {
     fn into_pixel(&self) -> &[u8] {
-        use gameboy::lcd::Shade::*;
+        use Shade::*;
         match *self {
             White => &[0xFF, 0xFF, 0xFF, 0xFF],
             LightGray => &[0xCC, 0xCC, 0xCC, 0xFF],
@@ -187,7 +190,7 @@ pub struct LCD {
     window_y: u8,
     window_x: u8,
 
-    frame: [u8; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4],
+    frame: [u8; SCREEN_WIDTH as usize * SCREEN_HEIGHT as usize * 4],
     last_frame_hash: u64,
 
     vblank_set: bool,
@@ -198,8 +201,6 @@ impl LCD {
     const MODE2_CYCLE_RANGE: i16 = LCD::SCANLINE_CYCLE_TOTAL - 80;
     const MODE3_CYCLE_RANGE: i16 = LCD::MODE2_CYCLE_RANGE - 172;
 
-    const SCREEN_WIDTH: u8 = 160;
-    const SCREEN_HEIGHT: u8 = 144;
     const VBLANK_HEIGHT: u8 = 154;
 
     pub fn new() -> LCD {
@@ -225,7 +226,7 @@ impl LCD {
             window_y: 0x00,
             window_x: 0x00,
 
-            frame: [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4],
+            frame: [0x00; SCREEN_WIDTH as usize * SCREEN_HEIGHT as usize * 4],
             last_frame_hash: 0,
 
             vblank_set: false,
@@ -304,8 +305,8 @@ impl LCD {
 
         self.scanline_cycle_count = LCD::SCANLINE_CYCLE_TOTAL;
         match self.lcd_y {
-            0..=LCD::SCREEN_HEIGHT if self.lcd_y < LCD::SCREEN_HEIGHT => self.draw_scanline(),
-            LCD::SCREEN_HEIGHT => ih.set_interrupt(Interrupt::VBlank),
+            0..=SCREEN_HEIGHT if self.lcd_y < SCREEN_HEIGHT => self.draw_scanline(),
+            SCREEN_HEIGHT => ih.set_interrupt(Interrupt::VBlank),
             // TODO: pad this out to reduce lag?
             // (give the emulated cpu more time than
             // the actual hardware cpu would have had
@@ -342,7 +343,7 @@ impl LCD {
         // store current mode so we can detect changes
         let prev_mode = self.status.mode_flag();
         // set mode based on scanline y position and cycle count
-        if self.lcd_y >= LCD::SCREEN_HEIGHT {
+        if self.lcd_y >= SCREEN_HEIGHT {
             self.status.set_mode_flag(Mode::VBlank);
         } else {
             if self.scanline_cycle_count >= LCD::MODE2_CYCLE_RANGE as i16 {
@@ -387,17 +388,17 @@ impl LCD {
 
         self.vblank_set = true;
         
-        use std::hash::{Hash, Hasher};
-        use std::collections::hash_map::DefaultHasher;
-        let mut hasher = DefaultHasher::new();
-        self.frame.hash(&mut hasher);
-        let frame_hash = hasher.finish();
-        if frame_hash != self.last_frame_hash {
-            self.last_frame_hash = frame_hash;
-            let _ = self.save_frame();
-            self.frame = [0x00; LCD::SCREEN_WIDTH as usize * LCD::SCREEN_HEIGHT as usize * 4];
-            let _ = self.save_tile_data();
-        }
+//        use std::hash::{Hash, Hasher};
+//        use std::collections::hash_map::DefaultHasher;
+//        let mut hasher = DefaultHasher::new();
+//        self.frame.hash(&mut hasher);
+//        let frame_hash = hasher.finish();
+//        if frame_hash != self.last_frame_hash {
+//            self.last_frame_hash = frame_hash;
+//            let _ = self.save_frame();
+//            self.frame = [0x00; SCREEN_WIDTH as usize * SCREEN_HEIGHT as usize * 4];
+//            let _ = self.save_tile_data();
+//        }
     }
 
     fn oam_search(&self, ih: &mut InterruptHandler) {
@@ -421,8 +422,8 @@ impl LCD {
     }
 
     fn draw_bg(&mut self) {
-        use gameboy::lcd::TileDataAddressRange::*;
-        use gameboy::lcd::TileMapAddressRange::*;
+        use TileDataAddressRange::*;
+        use TileMapAddressRange::*;
         let in_window = self.control.window_enable() && self.lcd_y >= self.window_y;
 
         let tile_data_offset = match self.control.tile_data() {
@@ -444,7 +445,7 @@ impl LCD {
 
         let tile_y = (map_y / 8) as u16;
 
-        for pixel_x in 0..LCD::SCREEN_WIDTH {
+        for pixel_x in 0..SCREEN_WIDTH {
             // TODO: optimize this loop to do blocks of 8 pixels?
             // otherwise we calculate the addresses of and read the same bytes 8 times
             let map_x = if in_window && pixel_x >= self.window_x - 7 {
@@ -478,7 +479,7 @@ impl LCD {
             let pixel = shade.into_pixel();
 
             let frame_pixel_start =
-                (self.lcd_y as usize * LCD::SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
+                (self.lcd_y as usize * SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
             let frame_pixel_end = frame_pixel_start + 4;
             let pixel_slice = &mut self.frame[frame_pixel_start..frame_pixel_end];
             pixel_slice.clone_from_slice(&pixel[..4]);
@@ -535,7 +536,7 @@ impl LCD {
 
                 let pixel_x = sprite.x_position - 8 + sprite_column;
                 let frame_pixel_start =
-                    (self.lcd_y as usize * LCD::SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
+                    (self.lcd_y as usize * SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
                 let frame_pixel_end = frame_pixel_start + 4;
                 let pixel_slice = &mut self.frame[frame_pixel_start..frame_pixel_end];
                 pixel_slice.clone_from_slice(&pixel[..4]);
@@ -563,7 +564,7 @@ impl LCD {
         let ref mut w = BufWriter::new(file);
 
         let mut png_encoder =
-            png::Encoder::new(w, LCD::SCREEN_WIDTH as u32, LCD::SCREEN_HEIGHT as u32);
+            png::Encoder::new(w, SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32);
         png_encoder.set_color(png::ColorType::RGBA);
         png_encoder.set_depth(png::BitDepth::Eight);
         let mut writer = png_encoder.write_header()?;

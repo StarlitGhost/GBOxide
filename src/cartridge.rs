@@ -319,11 +319,11 @@ impl Header {
             _ => false
         };
         let title = match cgb_flag {
-            true => ::utils::string::str_from_u8_null_utf8(&raw_title[..11])?.to_string(),
-            false => ::utils::string::str_from_u8_null_utf8(&raw_title)?.to_string()
+            true => crate::utils::string::str_from_u8_null_utf8(&raw_title[..11])?.to_string(),
+            false => crate::utils::string::str_from_u8_null_utf8(&raw_title)?.to_string()
         };
         let manufacturer_code = match cgb_flag {
-            true => ::utils::string::str_from_u8_null_utf8(&raw_manufacturer_code) ?.to_string(),
+            true => crate::utils::string::str_from_u8_null_utf8(&raw_manufacturer_code) ?.to_string(),
             false => String::new()
         };
 
@@ -335,7 +335,7 @@ impl Header {
         };
         let licensee_code = match sgb_flag {
             true => {
-                let l_c = ::utils::string::str_from_u8_null_utf8(&raw_new_licensee_code)?;
+                let l_c = crate::utils::string::str_from_u8_null_utf8(&raw_new_licensee_code)?;
                 Header::lookup_new_licensee_code(&l_c)?.to_string()
             },
             false => Header::lookup_old_licensee_code(&raw_old_licensee_code)?.to_string(),

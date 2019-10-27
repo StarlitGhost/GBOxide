@@ -2,6 +2,7 @@
 name = "gboxide"
 version = "0.1.0"
 authors = ["StarlitGhost <36834781+StarlitGhost@users.noreply.github.com>"]
+edition = "2018"
 
 [dependencies]
 bitfield = "0.13.2"
@@ -11,6 +12,7 @@ clap = {version = "2.33", features = ["yaml"]}
 num-derive = "0.3"
 num-traits = "0.2"
 png = "0.15.0"
-wgpu = "0.3.0"
+pixels = { git = "https://github.com/parasyte/pixels", rev = "cc04f14a3dd5bf2d35bcd2427931f0507311ba1e" }
 imgui-wgpu = "0.1.0"
 winit = "0.20.0-alpha4"
+winit_input_helper = "0.4.0-alpha4"

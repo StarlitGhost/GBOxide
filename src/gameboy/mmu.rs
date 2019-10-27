@@ -1,7 +1,7 @@
-use cartridge::Cartridge;
-use gameboy::interrupt::InterruptHandler;
-use gameboy::timer::Timer;
-use gameboy::lcd::LCD;
+use crate::cartridge::Cartridge;
+use crate::gameboy::interrupt::InterruptHandler;
+use crate::gameboy::timer::Timer;
+use crate::gameboy::lcd::LCD;
 
 //TODO: all basic stubs in here, should be rom/ram banks, vram, etc
 

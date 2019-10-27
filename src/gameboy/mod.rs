@@ -7,8 +7,8 @@ pub mod lcd;
 
 use std::error::Error;
 
-use ::cartridge::Cartridge;
-use ::gameboy;
+use crate::cartridge::Cartridge;
+use crate::gameboy;
 
 pub struct GameBoy {
     cpu: gameboy::cpu::CPU,
@@ -24,6 +24,10 @@ impl GameBoy {
         let mmu = gameboy::mmu::MMU::new(cartridge);
 
         GameBoy { cpu, mmu }
+    }
+
+    pub fn draw_frame(&self, frame: &mut [u8]) {
+        frame.clone_from_slice(self.mmu.lcd.get_frame());
     }
 
     pub fn run_to_vblank(&mut self) -> Result<(), Box<dyn Error>> {

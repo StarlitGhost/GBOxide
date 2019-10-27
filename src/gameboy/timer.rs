@@ -1,6 +1,6 @@
 use num_traits::FromPrimitive;
 
-use gameboy::interrupt::{InterruptHandler, Interrupt};
+use crate::gameboy::interrupt::{InterruptHandler, Interrupt};
 
 #[derive(Clone, Copy, Debug, FromPrimitive)]
 pub enum Clock {
