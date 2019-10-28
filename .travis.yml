@@ -20,14 +20,14 @@ before_cache:
 before_deploy:
     - "if [[ -f target/release/gboxide ]]; then mv target/release/gboxide \"target/release/gboxide-$TRAVIS_TAG-$TRAVIS_OS_NAME\"; fi"
 deploy:
-  - provider: cargo
-    skip_cleanup: true
-    on:
-        tags: true
-        condition: "$TRAVIS_RUST_VERSION = stable && $TRAVIS_OS_NAME = linux"
-        branch: master
-    token:
-        secure: "NdiU7ViK11KdxQX+b0w+e1lDhEdU81tEbfbg2xuUeB3o58ZHzKXPlVSexTwwLdmulBgincYeiIPqKSQLjbWGQtJnXZ7JocPWfoaRm0x43a7X7dTZgUnUnAUeuyJ+jhuXEp7l+btz+a/kcs1eDgWOqSzOQQHhKv5v3Hma50h5SMslt8G/c9fRGKIZwEIucggsqtiKXZ0DpNJG2QNpecphmDSE1Ho/kKVixCpXf1YOShu3aHbsuj6qDwXmD73bc25QC0Y91MuEe6WBbz0seEiM3cV/pw0iup2ULNIaPSdSN1O6fQvzD5mEKkp13/3j4cZOAHgeEt3Bzds2Pnkd4y3KARULrPYnlLZuzzE3PUnTTJCSYaQ11eqg0ucnP0XsEyOBGcsPPyE5hMUnN3/cvBRJxUVNvUbQm3pImPoVXrlFILXd7kpsMK2vnheYbEEa1RIR4+a/JX1BPkhZz/HZL6W4eF1mQOZabIbjxE9xqT/abnvV6CsIjICrhxfeeWpPU0EqfH6FEYhyqu7/ZhdAIhRLBvkbPSEjXmqj1R/PfX7o55uYrbBe+nY6Dx6I5TKnBHy3Ts7f8IZ4zwee8qYgx0LOsWd9+gMH7rF4aeb8y2p2K4WHU0TC4HH0Xnuno17B1qSNlI8szxSSjCLNy9ldmUwTPj7nk4bWS4p/qwYNKttTNiI="
+# - provider: cargo
+#   skip_cleanup: true
+#   on:
+#       tags: true
+#       condition: "$TRAVIS_RUST_VERSION = stable && $TRAVIS_OS_NAME = linux"
+#       branch: master
+#   token:
+#       secure: "NdiU7ViK11KdxQX+b0w+e1lDhEdU81tEbfbg2xuUeB3o58ZHzKXPlVSexTwwLdmulBgincYeiIPqKSQLjbWGQtJnXZ7JocPWfoaRm0x43a7X7dTZgUnUnAUeuyJ+jhuXEp7l+btz+a/kcs1eDgWOqSzOQQHhKv5v3Hma50h5SMslt8G/c9fRGKIZwEIucggsqtiKXZ0DpNJG2QNpecphmDSE1Ho/kKVixCpXf1YOShu3aHbsuj6qDwXmD73bc25QC0Y91MuEe6WBbz0seEiM3cV/pw0iup2ULNIaPSdSN1O6fQvzD5mEKkp13/3j4cZOAHgeEt3Bzds2Pnkd4y3KARULrPYnlLZuzzE3PUnTTJCSYaQ11eqg0ucnP0XsEyOBGcsPPyE5hMUnN3/cvBRJxUVNvUbQm3pImPoVXrlFILXd7kpsMK2vnheYbEEa1RIR4+a/JX1BPkhZz/HZL6W4eF1mQOZabIbjxE9xqT/abnvV6CsIjICrhxfeeWpPU0EqfH6FEYhyqu7/ZhdAIhRLBvkbPSEjXmqj1R/PfX7o55uYrbBe+nY6Dx6I5TKnBHy3Ts7f8IZ4zwee8qYgx0LOsWd9+gMH7rF4aeb8y2p2K4WHU0TC4HH0Xnuno17B1qSNlI8szxSSjCLNy9ldmUwTPj7nk4bWS4p/qwYNKttTNiI="
   - provider: releases
     skip_cleanup: true
     on:
