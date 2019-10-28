@@ -7,4 +7,34 @@ matrix:
     allow_failures:
         - rust: nightly
     fast_finish: true
-cache: cargo
+os:
+  - windows
+  - linux
+  - osx
+cache:
+    directories:
+        - $TRAVIS_HOME/.cargo
+before_cache:
+    - rm -rf $TRAVIS_HOME/.cargo/registry
+before_deploy:
+    - "if [[ -f target/release/gboxide ]]; then mv target/release/gboxide \"target/release/gboxide-$TRAVIS_TAG-$TRAVIS_OS_NAME\"; fi"
+deploy:
+  - provider: cargo
+    skip_cleanup: true
+    on:
+        tags: true
+        condition: "$TRAVIS_RUST_VERSION = stable && $TRAVIS_OS_NAME = linux"
+        branch: master
+    token:
+        secure: "NdiU7ViK11KdxQX+b0w+e1lDhEdU81tEbfbg2xuUeB3o58ZHzKXPlVSexTwwLdmulBgincYeiIPqKSQLjbWGQtJnXZ7JocPWfoaRm0x43a7X7dTZgUnUnAUeuyJ+jhuXEp7l+btz+a/kcs1eDgWOqSzOQQHhKv5v3Hma50h5SMslt8G/c9fRGKIZwEIucggsqtiKXZ0DpNJG2QNpecphmDSE1Ho/kKVixCpXf1YOShu3aHbsuj6qDwXmD73bc25QC0Y91MuEe6WBbz0seEiM3cV/pw0iup2ULNIaPSdSN1O6fQvzD5mEKkp13/3j4cZOAHgeEt3Bzds2Pnkd4y3KARULrPYnlLZuzzE3PUnTTJCSYaQ11eqg0ucnP0XsEyOBGcsPPyE5hMUnN3/cvBRJxUVNvUbQm3pImPoVXrlFILXd7kpsMK2vnheYbEEa1RIR4+a/JX1BPkhZz/HZL6W4eF1mQOZabIbjxE9xqT/abnvV6CsIjICrhxfeeWpPU0EqfH6FEYhyqu7/ZhdAIhRLBvkbPSEjXmqj1R/PfX7o55uYrbBe+nY6Dx6I5TKnBHy3Ts7f8IZ4zwee8qYgx0LOsWd9+gMH7rF4aeb8y2p2K4WHU0TC4HH0Xnuno17B1qSNlI8szxSSjCLNy9ldmUwTPj7nk4bWS4p/qwYNKttTNiI="
+  - provider: releases
+    skip_cleanup: true
+    on:
+        tags: true
+        condition: "$TRAVIS_RUST_VERSION = stable"
+        branch: master
+    file_glob: true
+    file:
+        - target/release/gboxide-*
+    api_key:
+        secure: "DGW0MwWp0QMyyJjdMJh0/FzGT4V258LVF0EplcqQjaEpYz2nYo06ogEki9hcjUEy70T1kHVwoCSepb/aV2WTjfoKYG6kKtU6MNYgwE24hYpkVlLuDD2N8QsWXGpllOKQ3ohc+AJzwZv2g81S7uH7PfKXK1ZSjfY2kgnNBE9eP6foxznogbe8n6YnEgUNIBZdcU/fStQrKTsLLR4hsagsZlwCXNBiFalZSIYb5f4cpRNM/xMfwy38ov6WJqmhDtq5kSzf17GoR5FX5QlgazPibgwaFgeMZvM6mOC6TynHCdWSIlJnVYhHIQXkyUdvrSAi4jVO43qNjX7RKxHyJ5tEGA9FUTPZn541pe5Z8l3ejuv5auAh4mUnU+v6zemxenoq+UaD70hnBq8EheIpMWqd7s+WeuIvPLSRdWSv/mfdzZ6gTjQORidA7sICb0So1ZrNlD6iTXcfAurzcXCpxUnN1pv16FjPKMxfvEC/jjpQ1qQJM9O3hMdQTCKcb6eU9iDdPn1Z4ZreMHNosArSxGc6q64vbQ01AbVDe860NOrg/iniLAqF2x4jJestcVabFDcXXD4WbEeYg6L0YbUMjkYPuA72csFFatVZ8znqDf7GGmmkEh7MYJcWVfQfbea2APz94MrBj4tIlesJBfuRMFNuNWsaQLyFCGGT1COlLD+J3Gw="
