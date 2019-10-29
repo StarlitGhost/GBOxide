@@ -1,7 +1,7 @@
-name: GameBoy Oxide
-version: "0.1"
+name: GB Oxide
+version: "0.1.0"
 about: A GameBoy Emulator written in Rust
-author: StarlitGhost <starlitwraith@gmail.com>
+author: StarlitGhost <gameboy@starlitghost.xyz>
 
 settings:
 - ArgRequiredElseHelp
