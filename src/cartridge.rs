@@ -79,10 +79,10 @@ impl Cartridge {
         header_bytes.copy_from_slice(&rom[0x100..0x150]);
         let header = Header::new(header_bytes)?;
 
+        use CartridgeType as CT;
         let mbc: Box<dyn MBC> = match header.cartridge_type {
-            CartridgeType::ROM => Box::new(ROM::new(rom)),
-            CartridgeType::ROM_RAM => Box::new(ROM_RAM::new(&header, rom)),
-            CartridgeType::MBC1 => Box::new(MBC1::new(&header, rom)),
+            CT::ROM | CT::ROM_RAM | CT::ROM_RAM_BATTERY => Box::new(ROM::new(&header, rom)),
+            CT::MBC1 | CT::MBC1_RAM | CT::MBC1_RAM_BATTERY => Box::new(MBC1::new(&header, rom)),
             _ => panic!("Cartridge type {:?} is not yet implemented", header.cartridge_type),
         };
 
@@ -109,30 +109,12 @@ trait MBC {
     fn rom_len(&self) -> usize;
 }
 
-struct ROM {
-    rom: Vec<u8>,
-}
-impl MBC for ROM {
-    fn read(&self, addr: u16) -> u8 {
-        match addr {
-            0x0000 ..= 0x7FFF => self.rom[addr as usize],
-            _ => 0xFF,
-        }
-    }
-    fn write(&mut self, _addr: u16, _value: u8) {}
-
-    fn rom_len(&self) -> usize { self.rom.len() }
-}
-impl ROM {
-    fn new(rom: Vec<u8>) -> ROM { ROM { rom } }
-}
-
 #[allow(non_camel_case_types)]
-struct ROM_RAM {
+struct ROM {
     rom: Vec<u8>,
     ram: Vec<u8>,
 }
-impl MBC for ROM_RAM {
+impl MBC for ROM {
     fn read(&self, addr: u16) -> u8 {
         match addr {
             0x0000 ..= 0x7FFF => self.rom[addr as usize],
@@ -149,11 +131,11 @@ impl MBC for ROM_RAM {
 
     fn rom_len(&self) -> usize { self.rom.len() }
 }
-impl ROM_RAM {
-    fn new(header: &Header, rom: Vec<u8>) -> ROM_RAM {
+impl ROM {
+    fn new(header: &Header, rom: Vec<u8>) -> ROM {
         let ram = vec![0x0; header.ram_size as usize];
 
-        ROM_RAM { rom, ram }
+        ROM { rom, ram }
     }
 }
 
