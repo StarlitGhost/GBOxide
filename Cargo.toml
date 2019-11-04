@@ -13,6 +13,6 @@ num-derive = "0.3"
 num-traits = "0.2"
 png = "0.15.0"
 pixels = { git = "https://github.com/parasyte/pixels", rev = "cc04f14a3dd5bf2d35bcd2427931f0507311ba1e" }
-imgui-wgpu = "0.1.0"
+imgui-wgpu = "0.4.1"
 winit = "0.20.0-alpha4"
 winit_input_helper = "0.4.0-alpha4"
