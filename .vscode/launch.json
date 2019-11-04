@@ -21,9 +21,11 @@
             "program": "${workspaceFolder}/target/debug/gboxide",
             "args": [
                 //"./roms/test/cpu_instrs/cpu_instrs.gb"    // MBC1 - passes!
+                //"./roms/test/instr_timing/instr_timing.gb"    // MBC1 - fails
+                //"./roms/test/mooneye/acceptance/call_timing.gb"
                 //"./roms/tetris.gb"      // ROM - seems to work!
-                "./roms/dr_mario.gb"    // ROM - freezes going in-game
-                //"./roms/kirby_1.gb"     // MBC1 - freezes, no output
+                //"./roms/dr_mario.gb"    // ROM - freezes going in-game
+                "./roms/kirby_1.gb"     // MBC1 - seems to work!
                 //"./roms/pokemon_red.gb" // MBC3 RAM BATTERY
                 //"./roms/awakening.gb"   // MBC5 RAM BATTERY
             ],

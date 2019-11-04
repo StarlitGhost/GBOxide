@@ -1,9 +1,23 @@
 [package]
 name = "gboxide"
-version = "0.1.0"
+version = "0.2.0"
 description = "A GameBoy Emulator written in Rust"
 authors = ["StarlitGhost <gboxide@starlitghost.xyz>"]
 edition = "2018"
+repository = "https://github.com/StarlitGhost/GBOxide"
+readme = "README.md"
+keywords = ["gameboy", "dmg", "emulator"]
+categories = ["emulators"]
+license = "MIT"
+include = [
+    "/Cargo.*",
+    "/LICENSE",
+    "README.md",
+    "/src/**/*",
+]
+
+[badges]
+travis-ci = { repository = "StarlitGhost/GBOxide" }
 
 [dependencies]
 bitfield = "0.13.2"
@@ -13,7 +27,7 @@ clap = "2.33"
 num-derive = "0.3"
 num-traits = "0.2"
 png = "0.15.0"
-pixels = { git = "https://github.com/parasyte/pixels", rev = "cc04f14a3dd5bf2d35bcd2427931f0507311ba1e" }
-imgui-wgpu = "0.1.0"
+pixels = "0.0.2"
+imgui-wgpu = "0.4.1"
 winit = "0.20.0-alpha4"
 winit_input_helper = "0.4.0-alpha4"
