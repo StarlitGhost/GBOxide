@@ -1,7 +1,7 @@
 # GBOxide [![Travis Build Status Badge](https://travis-ci.com/StarlitGhost/GBOxide.svg?branch=master)](https://travis-ci.com/StarlitGhost/GBOxide) [![Crates.io](https://img.shields.io/crates/v/gboxide)](https://crates.io/crates/gboxide)
 A GameBoy Emulator written in Rust
 
-## Download [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/StarlitGhost/GBOxide)](https://github.com/StarlitGhost/GBOxide/releases/latest)
+## Download [![GitHub release (latest SemVer including pre-releases)](https://img.shields.io/github/v/release/StarlitGhost/GBOxide?include_prereleases)](https://github.com/StarlitGhost/GBOxide/releases/latest)
 
 ## Launch Instructions
 Run from the command line with a ROM file, like so:
