@@ -8,14 +8,21 @@ use std::process;
 use gboxide::cartridge::Cartridge;
 use gboxide::gui;
 
-//#[cfg(feature = "yaml")]
 fn main() {
-    let yaml = load_yaml!("cli.yaml");
-    let args = clap::App::from_yaml(yaml).get_matches();
+    let args = clap::App::new(crate_name!())
+                        .version(crate_version!())
+                        .author(crate_authors!())
+                        .about(crate_description!())
+                        .arg(clap::Arg::with_name("ROMFILE")
+                            .help("GameBoy ROM to load")
+                            .required(true)
+                            .index(1))
+                        .setting(clap::AppSettings::ArgRequiredElseHelp)
+                        .get_matches();
     let filename = args.value_of("ROMFILE").unwrap();
 
     let cartridge = Cartridge::new(filename).unwrap_or_else(|err| {
-        eprintln!("Problem loading cartridge: {}", err);
+        eprintln!("Problem loading cartridge \"{}\": {}", filename, err);
         process::exit(1);
     });
 

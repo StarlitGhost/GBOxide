@@ -1,14 +1,15 @@
 [package]
 name = "gboxide"
 version = "0.1.0"
-authors = ["StarlitGhost <36834781+StarlitGhost@users.noreply.github.com>"]
+description = "A GameBoy Emulator written in Rust"
+authors = ["StarlitGhost <gboxide@starlitghost.xyz>"]
 edition = "2018"
 
 [dependencies]
 bitfield = "0.13.2"
 bitflags = "1.2.1"
 byteorder = "1.3.2"
-clap = {version = "2.33", features = ["yaml"]}
+clap = "2.33"
 num-derive = "0.3"
 num-traits = "0.2"
 png = "0.15.0"
