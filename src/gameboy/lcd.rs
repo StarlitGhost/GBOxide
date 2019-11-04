@@ -521,6 +521,13 @@ impl LCD {
             let pixel_data = &self.vram_tile_data[sprite_data_start..sprite_data_end];
 
             for sprite_column in 0..8 {
+                let mut pixel_x = sprite.x_position as u16 + sprite_column as u16;
+                if pixel_x < 8 || pixel_x >= SCREEN_WIDTH as u16 + 8 {
+                     // offscreen, skip
+                    continue;
+                }
+                pixel_x = pixel_x - 8;
+
                 let pixel_bit = if sprite.attributes.x_flip() {
                     sprite_column
                 } else {
@@ -542,7 +549,6 @@ impl LCD {
                 let shade = palette.colour(palette_index);
                 let pixel = shade.into_pixel();
 
-                let pixel_x = sprite.x_position - 8 + sprite_column;
                 let frame_pixel_start =
                     (self.lcd_y as usize * SCREEN_WIDTH as usize * 4) + (pixel_x as usize * 4);
                 let frame_pixel_end = frame_pixel_start + 4;
