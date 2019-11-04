@@ -188,7 +188,7 @@ impl MBC1 {
     }
 
     fn read_selected_rom_bank(&self, addr: u16) -> u8 {
-        let bank_addr = 0x4000 * (self.rom_bank_selection as u16) + (addr - 0x4000);
+        let bank_addr = 0x4000 * (self.rom_bank_selection as u32) + (addr as u32 - 0x4000);
         if (bank_addr as usize) < self.rom.len() {
             self.rom[bank_addr as usize]
         } else {
@@ -199,7 +199,7 @@ impl MBC1 {
     fn read_selected_ram_bank(&self, addr: u16) -> u8 {
         if !self.ram_enabled { return 0xFF }
 
-        let bank_addr = 0x2000 * (self.ram_bank_selection as u16) + (addr - 0xA000);
+        let bank_addr = 0x2000 * (self.ram_bank_selection as u32) + (addr as u32 - 0xA000);
         if (bank_addr as usize) < self.ram.len() {
             self.ram[bank_addr as usize]
         } else {
@@ -487,7 +487,7 @@ impl Header {
             &0x30 => Ok("Infogrames"),
             &0x31 => Ok("Nintendo"),
             &0x32 => Ok("Bandai"),
-            &0x33 => Err("GBC cart parsed as GB?".into()),
+            &0x33 => Ok("GBC cart parsed as GB?"),
             &0x34 => Ok("Konami"),
             &0x35 => Ok("Hector"),
             &0x38 => Ok("Capcom"),
