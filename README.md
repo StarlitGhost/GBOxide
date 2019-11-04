@@ -1,5 +1,19 @@
-# GBOxide [![Build Status](https://travis-ci.com/StarlitGhost/GBOxide.svg?branch=master)](https://travis-ci.com/StarlitGhost/GBOxide)
+# GBOxide [![Travis Build Status Badge](https://travis-ci.com/StarlitGhost/GBOxide.svg?branch=master)](https://travis-ci.com/StarlitGhost/GBOxide) [![Crates.io](https://img.shields.io/crates/v/gboxide)](https://crates.io/crates/gboxide)
 A GameBoy Emulator written in Rust
+
+## Download [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/StarlitGhost/GBOxide)](https://github.com/StarlitGhost/GBOxide/releases/latest)
+
+## Launch Instructions
+Run from the command line with a ROM file, like so:
+
+`$ ./gboxide roms/game.gb`
+
+## Controls
+* DPad: Arrow Keys
+* A: x
+* B: z
+* Start: Return
+* Select: Space
 
 ## References
 
