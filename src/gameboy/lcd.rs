@@ -502,17 +502,17 @@ impl LCD {
         };
 
         for sprite in self.vram_oam.iter() {
-            let y_pos = sprite.y_position as i16 - 16;
+            let y_pos = sprite.y_position;
             // skip over this sprite if the current LCD line doesn't intersect it
-            if !(y_pos..(y_pos + y_size as i16)).contains(&(self.lcd_y as i16)) {
+            if y_pos <= (self.lcd_y + 16 - y_size) || y_pos > (self.lcd_y + 16) {
                 continue;
             }
 
             // calculate the line within the sprite that the current LCD line intersects
             let sprite_line = if sprite.attributes.y_flip() {
-                y_size - (self.lcd_y - y_pos as u8)
+                y_size - (self.lcd_y + 16 - y_pos)
             } else {
-                self.lcd_y - y_pos as u8
+                self.lcd_y + 16 - y_pos
             };
 
             let sprite_data_start =
