@@ -209,7 +209,7 @@ impl LCD {
             vram_bg_maps: [0x00; 0x0800],
             vram_oam: [OAM::new(); 40],
 
-            control: Control(0x00),
+            control: Control(0x80),
             status: Status(0x00),
 
             scroll_y: 0x00,
@@ -253,7 +253,15 @@ impl LCD {
 
     pub fn write_register(&mut self, addr: u16, value: u8) {
         match addr {
-            0xFF40 => self.control.set_bits(value),
+            0xFF40 => {
+                if self.control.enable() != (value & 0x80 > 0) {
+                    self.lcd_y = 0;
+                    self.scanline_cycle_count = LCD::SCANLINE_CYCLE_TOTAL;
+                    let mode = if value & 0x80 > 0 { Mode::OAMSearch } else { Mode::HBlank };
+                    self.status.set_mode_flag(mode);
+                }
+                self.control.set_bits(value)
+            },
             0xFF41 => self.status.set_bits(value),
             0xFF42 => self.scroll_y = value,
             0xFF43 => self.scroll_x = value,
