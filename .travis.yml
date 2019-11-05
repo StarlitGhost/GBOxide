@@ -7,16 +7,12 @@ matrix:
     allow_failures:
         - rust: nightly
     fast_finish: true
-script: cargo build --verbose --release; cargo test --verbose
+script: cargo build --verbose --release
 os:
   - windows
   - linux
   - osx
-cache:
-    directories:
-        - $TRAVIS_HOME/.cargo
-before_cache:
-    - rm -rf $TRAVIS_HOME/.cargo/registry
+cache: cargo
 before_deploy:
     - "if [[ -f target/release/gboxide ]]; then mv target/release/gboxide \"target/release/gboxide-$TRAVIS_TAG-$TRAVIS_OS_NAME\"; fi"
 deploy:
