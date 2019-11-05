@@ -313,17 +313,21 @@ impl LCD {
 
         self.scanline_cycle_count = LCD::SCANLINE_CYCLE_TOTAL;
         match self.lcd_y {
-            0..=SCREEN_HEIGHT if self.lcd_y < SCREEN_HEIGHT => self.draw_scanline(),
-            SCREEN_HEIGHT => ih.set_interrupt(Interrupt::VBlank),
+            0..=SCREEN_HEIGHT if self.lcd_y < SCREEN_HEIGHT => {
+                self.draw_scanline();
+                self.lcd_y += 1;
+            },
+            SCREEN_HEIGHT => {
+                ih.set_interrupt(Interrupt::VBlank);
+                self.lcd_y += 1;
+            },
             // TODO: pad this out to reduce lag?
             // (give the emulated cpu more time than
             // the actual hardware cpu would have had
             // to process each frame)
             LCD::VBLANK_HEIGHT => self.lcd_y = 0,
-            _ => (),
+            _ => self.lcd_y += 1,
         }
-
-        self.lcd_y += 1;
     }
 
     pub fn vblank_reached(&mut self) -> bool {
@@ -510,7 +514,7 @@ impl LCD {
 
             // calculate the line within the sprite that the current LCD line intersects
             let sprite_line = if sprite.attributes.y_flip() {
-                y_size - (self.lcd_y + 16 - y_pos)
+                7 - (self.lcd_y + 16 - y_pos)
             } else {
                 self.lcd_y + 16 - y_pos
             };
