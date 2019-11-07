@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "gboxide"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "bitfield 0.13.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
