@@ -12,6 +12,12 @@ os:
   - windows
   - linux
   - osx
+# stop travis from building twice on PRs
+# the regex is to allow tagged commits to build
+branches:
+    only:
+        - master
+        - /^\d+\.\d+(\.\d+)?(-\S*)$/
 cache: cargo
 before_deploy:
     - "if [[ -f target/release/gboxide ]]; then mv target/release/gboxide \"target/release/gboxide-$TRAVIS_TAG-$TRAVIS_OS_NAME\"; fi"
